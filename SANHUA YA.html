@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SANHUA YA — Repuestos HVAC/R</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="catalogo.js"></script>
+
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="ui.jsx"></script>
+  <script type="text/babel" src="sections.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+
+  <script type="text/babel">
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "tema": "Claro",
+      "acento": "#1763ad",
+      "bordes": "Suave"
+    }/*EDITMODE-END*/;
+
+    const ACENTOS = ["#ef741b", "#1763ad", "#129b9b", "#e0473b"];
+    const RADIOS = { "Recto": "6px", "Suave": "16px", "Redondo": "22px" };
+
+    function Root() {
+      const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+      React.useEffect(() => {
+        const r = document.documentElement;
+        r.setAttribute("data-theme", t.tema === "Oscuro" ? "dark" : "light");
+        r.style.setProperty("--accent", t.acento);
+        // derivar un naranja un poco más oscuro para hover del botón wpp
+        r.style.setProperty("--orange", t.acento);
+        r.style.setProperty("--radius", RADIOS[t.bordes] || "16px");
+        r.style.setProperty("--radius-sm", t.bordes === "Recto" ? "5px" : t.bordes === "Redondo" ? "16px" : "11px");
+      }, [t.tema, t.acento, t.bordes]);
+
+      return (
+        <React.Fragment>
+          <App />
+          <TweaksPanel title="Tweaks">
+            <TweakSection label="Apariencia" />
+            <TweakRadio label="Tema" value={t.tema} options={["Claro", "Oscuro"]}
+              onChange={(v) => setTweak("tema", v)} />
+            <TweakColor label="Color de acento" value={t.acento} options={ACENTOS}
+              onChange={(v) => setTweak("acento", v)} />
+            <TweakRadio label="Bordes" value={t.bordes} options={["Recto", "Suave", "Redondo"]}
+              onChange={(v) => setTweak("bordes", v)} />
+          </TweaksPanel>
+        </React.Fragment>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
+  </script>
+</body>
+</html>
