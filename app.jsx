@@ -3,6 +3,123 @@
 // Flujo: Tipo de equipo → Marca → Serie/Modelo → Componentes (carrito) → Cotización → Listo
 // Catálogo real en window.CATALOGO (catalogo.js)
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Motor de recomendaciones inteligentes para el carrito
+// ─────────────────────────────────────────────────────────────
+function getRecomendaciones(carrito) {
+  const cats = new Set(carrito.map(c => c.item.categoria));
+  const comps = carrito.map(c => [c.item.componente, c.item.codigoSanhua, c.item.nota || ''].join(' ')).join(' ').toLowerCase();
+  const inCart = (re) => re.test(comps);
+  const recs = [];
+
+  // Válvula 4 vías → bobina obligatoria
+  if (cats.has('reversing') && !cats.has('coil') && !inCart(/bobina|coil/)) {
+    recs.push({
+      key: 'coil-reversing', urgencia: 'alta',
+      nombre: 'Bobina para válvula inversora',
+      codigo: 'SHF-4-10S · AC 220V · 4.5/3.5 W',
+      categoria: 'coil',
+      icono: '🔌',
+      razon: 'La bobina es el actuador eléctrico que mueve la válvula. Si la válvula falló por falta de señal o por corriente alta, la bobina suele estar quemada. Cambiarlas juntas evita volver al equipo.',
+    });
+  }
+
+  // Abrir el circuito sellado → filtro obligatorio
+  const abreCircuito = ['reversing', 'valve', 'solenoid'].some(c => cats.has(c));
+  if (abreCircuito && !cats.has('filter') && !inCart(/filtro|deshidratador|dtg|stgb|bgq|kgq/)) {
+    recs.push({
+      key: 'filter-circuit', urgencia: 'alta',
+      nombre: 'Filtro deshidratador',
+      codigo: 'DTG-E / STGB bidireccional · R32 / R410A / R22',
+      categoria: 'filter',
+      icono: '⚠️',
+      razon: 'Regla de oro: cada vez que se abre el circuito de gas, el filtro deshidratador se reemplaza. La humedad que entra destruye el compresor en pocas horas de operación. Es la pieza más barata de la reparación.',
+    });
+  }
+
+  // BDFM damper → ZWF26 forzador (trabajan juntos)
+  if (inCart(/bdfm|damper|compuerta/) && !inCart(/zwf26|forzador|brushless/)) {
+    recs.push({
+      key: 'fan-with-damper', urgencia: 'media',
+      nombre: 'Forzador DC Brushless',
+      codigo: 'ZWF26',
+      categoria: 'sensor',
+      icono: '💡',
+      razon: 'Damper y forzador trabajan en el mismo circuito de distribución de aire. Con el equipo ya abierto, es el momento de revisarlo — si el motor está ruidoso o lento, cuesta el mismo viaje cambiarlo ahora.',
+    });
+  }
+
+  // ZWF26 forzador → BDFM damper (la compuerta pudo forzarse)
+  if (inCart(/zwf26|forzador|brushless/) && !inCart(/bdfm|damper|compuerta/)) {
+    recs.push({
+      key: 'damper-with-fan', urgencia: 'media',
+      nombre: 'Damper motorizado (compuerta de aire)',
+      codigo: 'BDFM (Single)',
+      categoria: 'solenoid',
+      icono: '💡',
+      razon: 'Si el forzador falló por sobrecarga, puede que la compuerta esté trabada o el motor forzado. Revisarla en la misma visita evita que el forzador nuevo vuelva a sobrecargarse.',
+    });
+  }
+
+  // Bobina sola → filtro preventivo (técnico ya está en la unidad exterior)
+  if (cats.has('coil') && !cats.has('filter') && !abreCircuito && !inCart(/filtro|deshidratador/)) {
+    recs.push({
+      key: 'filter-preventive', urgencia: 'baja',
+      nombre: 'Filtro deshidratador bidireccional',
+      codigo: 'STGB · R32 / R410A — bidireccional',
+      categoria: 'filter',
+      icono: '🔧',
+      razon: 'El técnico ya va a estar en la unidad exterior. En equipos con más de 3 años es buena práctica revisar el filtro: si está colmatado afecta el rendimiento del ciclo completo.',
+    });
+  }
+
+  // Válvula de expansión → sensor NTC de tubería (calibrar subenfriamiento)
+  if (cats.has('valve') && !cats.has('sensor') && !inCart(/sensor|termistor|ntc/)) {
+    recs.push({
+      key: 'sensor-with-valve', urgencia: 'media',
+      nombre: 'Sensor NTC de tubería',
+      codigo: 'Serie NTC · sonda metálica abrazadera',
+      categoria: 'sensor',
+      icono: '🌡️',
+      razon: 'Con la válvula de expansión nueva, vale la pena verificar el termistor de tubería. Si está fuera de rango, la placa no va a regular bien el recalentamiento y la válvula no va a rendir.',
+    });
+  }
+
+  return recs.slice(0, 3);
+}
+
+function RecomendacionesSection({ carrito, onAgregar }) {
+  const recs = getRecomendaciones(carrito);
+  if (recs.length === 0) return null;
+  return (
+    <div className="rec-block">
+      <div className="rec-header">
+        <span className="rec-title">También te recomendamos</span>
+        <span className="rec-sub">Piezas relacionadas con tu pedido — para no volver al equipo dos veces</span>
+      </div>
+      <div className="rec-list">
+        {recs.map((r) => (
+          <div key={r.key} className={"rec-card rec-card--" + r.urgencia}>
+            <div className="rec-card-top">
+              <span className="rec-ico">{r.icono}</span>
+              <div className="rec-card-body">
+                <span className="rec-nombre">{r.nombre}</span>
+                <span className="codes"><span className="code code-sh"><span className="code-k">Sanhua</span>{r.codigo}</span></span>
+              </div>
+              <button className="rec-add-btn" onClick={() => onAgregar(r)}>
+                <IconPlus size={14} /> Agregar
+              </button>
+            </div>
+            <p className="rec-razon">{r.razon}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { getRecomendaciones, RecomendacionesSection });
+
 const { useState, useMemo, useEffect } = React;
 
 function App() {
@@ -155,20 +272,32 @@ function App() {
             <h2 className="screen-title">{marca?.marca} · elegí tu serie</h2>
             <p className="screen-sub">Seleccioná la línea o serie de tu equipo para ver sus componentes Sanhua.</p>
             <div className="grid grid-series">
-              {series.map(({ s, n }, i) => (
+              {series.map(({ s, n }, i) => {
+                const slotId = `sr-${(marca?.marca||'').toLowerCase().replace(/[^a-z0-9]/g,'-')}-${i}`;
+                return (
                 <button key={i} className={"sr-card" + (serie === s ? " sel" : "")}
                   onClick={() => { setSerie(s); setFiltroCat("Todos"); setStep(4); }}>
-                  <div className="sr-top">
-                    <span className="sr-name">{s.serie}</span>
-                    {s.refrigerante && <span className="rfr">{s.refrigerante}</span>}
-                  </div>
-                  {s.modelos && <div className="sr-models">{s.modelos}</div>}
-                  <div className="sr-foot">
-                    {s.btu && <span className="sr-btu">{s.btu}</span>}
-                    <span className="sr-go">{n} repuesto{n === 1 ? "" : "s"} <IconArrowRight size={14} /></span>
+                  <div className="sr-inner">
+                    <div className="sr-img-wrap" onClick={e => e.stopPropagation()}>
+                      <image-slot id={slotId} class="sr-img-slot" shape="rounded" radius="8" fit="contain"
+                        src={typeof acImg !== 'undefined' ? acImg(s.serie) : ''}
+                        placeholder="foto del equipo"></image-slot>
+                    </div>
+                    <div className="sr-text">
+                      <div className="sr-top">
+                        <span className="sr-name">{s.serie}</span>
+                        {s.refrigerante && <span className="rfr">{s.refrigerante}</span>}
+                      </div>
+                      {s.modelos && <div className="sr-models">{s.modelos}</div>}
+                      <div className="sr-foot">
+                        {s.btu && <span className="sr-btu">{s.btu}</span>}
+                        <span className="sr-go">{n} repuesto{n === 1 ? "" : "s"} <IconArrowRight size={14} /></span>
+                      </div>
+                    </div>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -255,6 +384,13 @@ function App() {
                 <IconPlus size={16} /> Agregar otro repuesto
               </button>
             </div>
+
+            <RecomendacionesSection carrito={carrito} onAgregar={(r) => {
+              const item = { componente: r.nombre, categoria: r.categoria, codigoSanhua: r.codigo, nota: r.razon };
+              if (!carrito.some(c => c.item.componente === item.componente)) {
+                setCarrito(prev => [...prev, { marca: 'Recomendado', serie: '', modelos: '', item, cantidad: 1 }]);
+              }
+            }} />
 
             <div className="form">
               <Field label="Nombre / Razón social" value={pedido.nombre} onChange={(v) => setPedido({ ...pedido, nombre: v })} placeholder="Ej: Refrigeración del Sur SRL" />
@@ -403,6 +539,37 @@ function App() {
                 );
               })}
             </div>
+
+            {/* Tabla de marcas compatibles (solo cuando la aplicación la tiene) */}
+            {appSel?.marcas && appSel.marcas.length > 0 && (
+              <div className="compat-block">
+                <h3 className="compat-title">Marcas compatibles</h3>
+                <p className="compat-sub">Modelos que usan componentes Sanhua en el mercado argentino.</p>
+                <div className="compat-table-wrap">
+                  <table className="compat-table">
+                    <thead>
+                      <tr>
+                        <th>Marca</th>
+                        <th>Líneas / Modelos</th>
+                        <th>Gama</th>
+                        <th>Códigos Sanhua</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {appSel.marcas.map((m, i) => (
+                        <tr key={i}>
+                          <td><b>{m.nombre}</b></td>
+                          <td className="compat-td-lineas">{m.lineas}</td>
+                          <td><span className={"compat-gama" + (m.gama.includes("Inverter") ? " gama-hi" : m.gama.includes("No Frost") ? " gama-mid" : " gama-lo")}>{m.gama}</span></td>
+                          <td className="compat-td-codes">{m.componentes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="compat-note">Las marcas se citan solo a fines de compatibilidad técnica y no implican afiliación con SANHUA.</p>
+              </div>
+            )}
             <p className="hint"><IconShield size={15} /> Repuestos Sanhua originales. Las marcas y modelos se citan solo a fines de compatibilidad.</p>
           </section>
           );

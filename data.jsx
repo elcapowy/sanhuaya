@@ -2,11 +2,30 @@
 // Datos de marca SANHUA + metadatos del catálogo (data real en catalogo.js)
 // ─────────────────────────────────────────────────────────────
 
-// Fabricantes (OEM) que equipan sus productos con componentes SANHUA.
-// Verificado en las listas de partes oficiales del catálogo Bellini.
+// Fabricantes (OEM) — lista corta para chips
 const OEM = [
   "Daikin", "Samsung", "Carrier", "LG", "Gree", "Midea", "Hisense",
-  "Haier", "Trane", "Mitsubishi", "York", "Copeland", "Emerson", "Heatcraft",
+  "Hitachi", "Panasonic", "Trane", "Mitsubishi E.", "BGH", "Philco", "RCA",
+];
+
+// Tabla OEM detallada (fuente: catálogo Bellini + documentación pública Sanhua)
+const OEM_DETALLE = [
+  { marca:"Gree",         ini:"GR", hue:150, componentes:"Válvulas 4 vías, VEE, sensores, filtros (100 % del mercado), VRF y rooftop",              segmento:"Residencial, comercial, industrial", tipo:"directo"    },
+  { marca:"Daikin",       ini:"DA", hue:210, componentes:"Válvulas 4 vías, VEE, termistores, filtros",                                               segmento:"Residencial, comercial, VRF",        tipo:"directo"    },
+  { marca:"Samsung",      ini:"SA", hue:232, componentes:"Válvulas 4 vías, VEE, bobinas — citado en listas oficiales de partes",                     segmento:"Residencial, comercial",             tipo:"directo"    },
+  { marca:"LG",           ini:"LG", hue:358, componentes:"Válvulas 4 vías, EEV, bobinas, sensores — códigos OEM confirmados",                        segmento:"Residencial, comercial",             tipo:"directo"    },
+  { marca:"Carrier",      ini:"CA", hue:8,   componentes:"Válvulas 4 vías, filtros, componentes de línea residencial y comercial",                   segmento:"Residencial, comercial, VRF, industrial", tipo:"directo" },
+  { marca:"Midea",        ini:"MI", hue:200, componentes:"Plataforma Sanhua OEM en splits inverter; válvulas 4 vías, VEE",                           segmento:"Residencial, comercial",             tipo:"directo"    },
+  { marca:"Hisense",      ini:"HI", hue:350, componentes:"Sanhua OEM en válvulas 4 vías; grupo Haier, >60 % del mercado",                            segmento:"Residencial",                        tipo:"directo"    },
+  { marca:"Hitachi",      ini:"HT", hue:38,  componentes:"Válvulas 4 vías, EEV — relación OEM confirmada globalmente por Sanhua",                    segmento:"Residencial, comercial",             tipo:"global"     },
+  { marca:"Panasonic",    ini:"PA", hue:26,  componentes:"Válvulas 4 vías, EEV — partner estratégico Sanhua a nivel global",                        segmento:"Residencial, comercial",             tipo:"global"     },
+  { marca:"Trane / York", ini:"TR", hue:32,  componentes:"Válvulas, solenoides, componentes de línea — clientes Sanhua confirmados",                 segmento:"Comercial, industrial",              tipo:"global"     },
+  { marca:"Mitsubishi E.",ini:"ME", hue:195, componentes:"Válvulas 4 vías, EEV — relación OEM documentada por Sanhua",                              segmento:"Residencial, comercial, VRF",        tipo:"global"     },
+  { marca:"BGH",          ini:"BG", hue:260, componentes:"Válvulas 4 vías, EEV — plataforma base Haier/Hisense ensamblada en Tierra del Fuego",     segmento:"Residencial, comercial",             tipo:"plataforma" },
+  { marca:"Philco",       ini:"PH", hue:270, componentes:"Componentes Sanhua heredados del OEM chino fabricante (Midea / Gree según modelo)",       segmento:"Residencial masivo",                 tipo:"plataforma" },
+  { marca:"RCA",          ini:"RC", hue:280, componentes:"Componentes Sanhua heredados del OEM chino fabricante (Midea / Gree según modelo)",       segmento:"Residencial masivo",                 tipo:"plataforma" },
+  { marca:"Surrey",       ini:"SU", hue:290, componentes:"Marca de licencia sobre plataforma china; componentes Sanhua probables según modelo",     segmento:"Residencial masivo",                 tipo:"plataforma" },
+  { marca:"Fedders",      ini:"FE", hue:300, componentes:"Marca de licencia; splits y equipos de ventana sobre plataforma china — Sanhua probable", segmento:"Residencial, ventana",               tipo:"plataforma" },
 ];
 
 // Datos corporativos verificados de SANHUA.
@@ -40,6 +59,7 @@ const BRAND_HUE = {
 // Prefiltro por tipo de aplicación (primer paso del flujo).
 const TIPOS = [
   { id: "todos", nombre: "Todos los equipos", desc: "Ver el catálogo completo", icon: "wrench" },
+  { id: "heladeras", nombre: "Heladeras", desc: "Familiares, No Frost e Inverter", icon: "fridge" },
   { id: "split", nombre: "Split residencial", desc: "Alta pared, inverter y on/off", icon: "wind" },
   { id: "vrf", nombre: "VRF / Multisplit", desc: "Caudal variable, Multi V, cassette y ducto", icon: "gauge" },
   { id: "comercial", nombre: "Comercial / Refrigeración", desc: "Cámaras, vitrinas, equipo de paquete", icon: "snowflake" },
@@ -49,6 +69,7 @@ const TIPOS = [
 function itemTipos(serie, modelos, comp, nota) {
   const c = [serie, modelos, comp, nota].join(" ").toLowerCase();
   const t = new Set();
+  if (/heladera|no.frost|c[ií]clic|freezer|twin.cool|family.hub|instaview|door.in.door|linear.inv|khd|kgd|hsi|phnf|dfx|efficient|gourmet|sexto.sentido|wro|wrm|wrw|no.frost.bio|black.edition|hre|m230|m320|m410|eurosystem|hgf|bdfm|zwf26|damper|forzador.dc|pasos.el[eé]ctrica|ddf|bgq|kgq|deshidratador.*cobre/.test(c)) t.add("heladeras");
   if (/vrf|vrv|multi ?v\b|multi v|multisplit|multi-split|cassette|ducto/.test(c)) t.add("vrf");
   if (/comercial|c[áa]mara|g[óo]ndola|vitrina|bohn|heatcraft|copeland|manitowoc|paquete|packaged|\brack\b|condensad/.test(c)) t.add("comercial");
   if (/split|alta pared|residencial|9\.000|12\.000|18\.000|24\.000|\b9k\b|\b12k\b|\b18k\b|\b24k\b/.test(c)) t.add("split");
@@ -111,6 +132,13 @@ const _A = {
   reversing:   _WR.prodReversing   || "assets/prod-reversing.png",
   valve:       _WR.prodValve       || "assets/prod-valve.png",
   solenoid:    _WR.prodSolenoid    || "assets/prod-solenoid.png",
+  bobina:      _WR.prodBobina      || "assets/prod-bobina-inversora.jpg",
+  jmk:         _WR.prodJmk         || "assets/prod-jmk.png",
+  bdfmSingle:  _WR.prodBdfmSingle  || "assets/prod-bdfm-single.png",
+  bdfmDouble:  _WR.prodBdfmDouble  || "assets/prod-bdfm-double.png",
+  zwf26:       _WR.prodZwf26       || "assets/prod-zwf26.png",
+  bgq:         _WR.prodBgq         || "assets/prod-bgq.png",
+  ddf:         _WR.prodDdf         || "assets/prod-ddf.jpg",
   filter:      _WR.prodFilter      || "assets/prod-filter.png",
   sensor:      _WR.prodSensor      || "assets/prod-sensor.png",
   pressure:    _WR.prodPressure    || "assets/prod-pressure.png",
@@ -126,7 +154,7 @@ const _A = {
 const PRODUCT_IMAGES = {
   reversing: _A.reversing,
   valve:     _A.valve,
-  coil:      _A.solenoid,
+  coil:      _A.bobina,
   solenoid:  _A.solenoid,
   filter:    _A.filter,
   sensor:    _A.sensor,
@@ -145,7 +173,13 @@ const PRODUCT_IMAGES = {
 
 // Reglas por nombre de componente (más específicas que categoría)
 const PROD_IMG_RULES = [
-  { re: /bobina|coil/i,                                   img: _A.solenoid    },
+  { re: /bobina|coil/i,                                   img: _A.bobina      },
+  { re: /JMK|TSA|magn[eé]tico.*puerta|puerta.*magn[eé]t/i, img: _A.jmk         },
+  { re: /ZWF|[Ff]orzador|[Bb]rushless|[Vv]entilador.*DC|DC.*[Vv]entilador/i, img: _A.zwf26      },
+  { re: /BGQ|KGQ|deshidratador.*cobre|filtro.*cobre|capilar/i, img: _A.bgq         },
+  { re: /DDF|pasos el[eé]ctrica|stepper/i,                   img: _A.ddf         },
+  { re: /BDFM.*[Dd]ouble|[Dd]ouble.*BDFM|damper.*doble|doble.*damper/i, img: _A.bdfmDouble  },
+  { re: /BDFM|damper|compuerta.*aire|aire.*compuerta/i,    img: _A.bdfmSingle  },
   { re: /kit\s*SEK|SEK\d/i,                               img: _A.sek         },
   { re: /núcleo|cartucho|SH48|HTG-A80/i,                  img: _A.core        },
   { re: /3 vías|3vias|KMV|doble mando/i,                  img: _A.threeWay    },
@@ -173,7 +207,7 @@ function prodImg(categoria, tipoLabel, nombre) {
   return PRODUCT_IMAGES[categoria] || null;
 }
 
-Object.assign(window, { OEM, SANHUA_FACTS, CERTS, CAT_LABEL, BRAND_HUE, TIPOS, itemTipos, matchTipo, COMPONENTES_INFO, PRODUCT_IMAGES, PROD_IMG_RULES, prodImg });
+Object.assign(window, { OEM, OEM_DETALLE, SANHUA_FACTS, CERTS, CAT_LABEL, BRAND_HUE, TIPOS, itemTipos, matchTipo, COMPONENTES_INFO, PRODUCT_IMAGES, PROD_IMG_RULES, prodImg });
 
 // ─────────────────────────────────────────────────────────────
 // Catálogo por APLICACIÓN — repuestos Sanhua agrupados por dónde se usan.
@@ -181,20 +215,57 @@ Object.assign(window, { OEM, SANHUA_FACTS, CERTS, CAT_LABEL, BRAND_HUE, TIPOS, i
 // ─────────────────────────────────────────────────────────────
 const APLICACIONES = [
   {
-    id: "heladeras", nombre: "Heladeras familiares", icon: "snowflake",
-    desc: "Doble mando residencial",
-    intro: "Repuestos Sanhua para heladeras con freezer de doble mando, donde una válvula deriva el gas para controlar cada cámara por separado. Componentes del circuito sellado, en el compartimento del compresor.",
+    id: "heladeras", nombre: "Heladeras", icon: "snowflake",
+    desc: "Familiares, No Frost, Inverter y cíclicas",
+    intro: "Repuestos Sanhua para heladeras nacionales e importadas: válvula de 3 vías de doble mando, válvulas DDF, forzadores ZWF26, dampers BDFM y filtros BGQ/KGQ. Los mismos componentes que montan de fábrica Samsung, LG, Whirlpool, Bosch, Mabe, Electrolux, Philco/Noblex, Koh-i-noor, Gafa y más.",
     repuestos: [
-      { componente: "Válvula de 3 vías (Kohinoor / Original)", categoria: "reversing", tipoLabel: "Válvula 3 vías",
-        codigoSanhua: "Modelos KMV432 · KHG41D/8", gases: ["R600", "R134a"],
-        aplicacion: "Permite derivar el gas para apagar la heladera y dejar el freezer funcionando (o viceversa). Es el corazón del sistema de doble mando.",
-        ubicacion: "Soldada en la línea de gas, dentro del compartimento del compresor, en la parte trasera inferior de la heladera.",
+      { componente: "Válvula de 3 vías (doble mando)", categoria: "reversing", tipoLabel: "Válvula 3 vías",
+        codigoSanhua: "KMV432 · KHG41D/8", gases: ["R600", "R134a"],
+        aplicacion: "Deriva el gas para apagar la heladera y dejar el freezer funcionando (o viceversa). Es el corazón del sistema de doble mando en heladeras familiares cíclicas.",
+        ubicacion: "Soldada en la línea de gas, dentro del compartimento del compresor, parte trasera inferior de la heladera.",
         iso: "Válvula 3 vías · línea de gas en el compresor" },
-      { componente: "Filtro deshidratador capilar", categoria: "filter",
-        codigoSanhua: "Capilar o para soldar · R600a / R134a", gases: ["R600", "R134a"],
-        aplicacion: "Retiene humedad y partículas del circuito sellado. Se reemplaza siempre que se abre el sistema para una reparación.",
-        ubicacion: "Soldado a la salida del condensador, justo antes del tubo capilar de entrada al evaporador.",
-        iso: "Filtro deshidratador · salida del condensador" },
+      { componente: "Válvula de pasos eléctrica (stepper valve)",
+        categoria: "valve", tipoLabel: "Válvula 3 vías",
+        codigoSanhua: "DDF-T · DDF-S · DDF-L · DDF-G · DDF-D", gases: ["R600", "R134a"],
+        aplicacion: "Gestiona el flujo de refrigerante entre los dos compartimentos (heladera / freezer) en equipos No Frost inverter de alta gama. Permite frío independiente por zona y ciclos de descongelado selectivos.",
+        ubicacion: "Soldada en la línea de refrigerante, dentro del compartimento del compresor, parte trasera inferior de la heladera.",
+        iso: "Válvula DDF · línea de refrigerante" },
+      { componente: "Forzador DC Brushless",
+        categoria: "sensor",
+        codigoSanhua: "ZWF26", gases: [],
+        aplicacion: "Motor de ventilador sin escobillas para la circulación forzada del aire frío dentro del gabinete. Compatible con señal PWM del módulo inverter. Presente en todas las líneas No Frost.",
+        ubicacion: "Montado sobre el evaporador interno, dentro del gabinete del freezer.",
+        iso: "Forzador ZWF26 · sobre el evaporador interno" },
+      { componente: "Damper motorizado (compuerta de aire)",
+        categoria: "solenoid", tipoLabel: "Damper motorizado",
+        codigoSanhua: "BDFM (Single) · BDFM (Double — doble compartimento)", gases: [],
+        aplicacion: "Compuerta motorizada que controla el paso de aire frío del freezer al refrigerador. El modelo Double gestiona dos zonas de temperatura independientes (0 °C en zona gourmet / cajón biológico).",
+        ubicacion: "En el conducto de distribución de aire entre el freezer y el compartimento de refrigeración.",
+        iso: "Damper BDFM · conducto de distribución de aire" },
+      { componente: "Sensor / interruptor magnético de puerta",
+        categoria: "sensor",
+        codigoSanhua: "JMK · TSA series", gases: [],
+        aplicacion: "Detecta apertura y cierre de puertas para activar iluminación LED progresiva, ajustar el forzador y disparar alarmas en modelos de alta gama.",
+        ubicacion: "Embutido en el marco de la puerta o en el gabinete, a la altura del cierre magnético.",
+        iso: "Sensor JMK/TSA · marco de puerta" },
+      { componente: "Filtro deshidratador de cobre",
+        categoria: "filter",
+        codigoSanhua: "BGQ / KGQ series", gases: ["R600", "R134a"],
+        aplicacion: "Retiene humedad e impurezas del circuito sellado. Soldado al tubo capilar, es el componente de reposición básico en todo service de heladera — cíclica, No Frost o dinámica.",
+        ubicacion: "Soldado en la línea de líquido, a la salida del condensador y antes del tubo capilar.",
+        iso: "Filtro BGQ/KGQ · salida del condensador" },
+    ],
+    marcas: [
+      { nombre: "Samsung",         lineas: "Twin Cooling, Family Hub, Evolution",       gama: "Inverter / No Frost Alta Gama",  componentes: "DDF, ZWF26, BDFM (Double), JMK/TSA, BGQ/KGQ" },
+      { nombre: "LG",              lineas: "InstaView, Door-in-Door, Linear Inverter",  gama: "Inverter / No Frost Alta Gama",  componentes: "DDF, ZWF26, BDFM (Single), JMK/TSA, BGQ/KGQ" },
+      { nombre: "Whirlpool AG",    lineas: "Gourmet, Sexto Sentido, WRO Side by Side",  gama: "Inverter / No Frost Alta Gama",  componentes: "DDF, ZWF26, BDFM (Double), BGQ/KGQ" },
+      { nombre: "Bosch",           lineas: "Serie 4, Serie 6 Inverter",                 gama: "Inverter / No Frost Alta Gama",  componentes: "DDF, ZWF26, BGQ/KGQ" },
+      { nombre: "Mabe / Patrick",  lineas: "No Frost Bio, Black Edition, HRE",          gama: "No Frost Regional / Estándar",   componentes: "ZWF26, BDFM (Single), BGQ/KGQ" },
+      { nombre: "Whirlpool",       lineas: "WRM (No Frost), WRW Inverter",              gama: "No Frost Regional / Estándar",   componentes: "ZWF26, BDFM (Single), BGQ/KGQ" },
+      { nombre: "Electrolux",      lineas: "Líneas DFX, Efficient AutoSense",           gama: "No Frost Regional / Estándar",   componentes: "ZWF26, BDFM (Single), BGQ/KGQ" },
+      { nombre: "Philco / Noblex", lineas: "Líneas No Frost PHNF",                      gama: "No Frost Regional / Estándar",   componentes: "ZWF26, BDFM (Single), BGQ/KGQ" },
+      { nombre: "Koh-i-noor",      lineas: "KHD, KGD (Cíclicas y Dinámicas)",           gama: "Cíclica / Dinámica",             componentes: "BGQ/KGQ, ZWF26 (ocasional), KMV432" },
+      { nombre: "Siam / Atma",     lineas: "Líneas Cíclicas HSI",                       gama: "Cíclica Tradicional",            componentes: "BGQ/KGQ" },
     ],
   },
   {

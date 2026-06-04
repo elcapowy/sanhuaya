@@ -2,6 +2,73 @@
 // Header · Home · Footer
 // ─────────────────────────────────────────────────────────────
 
+// Tabla OEM expandible
+const TIPO_META = {
+  directo:    { label: "OEM directo",  desc: "Documentado por Sanhua o en listas de partes",          color: "var(--green, #1a7a4a)" },
+  global:     { label: "OEM global",   desc: "Relación confirmada a nivel global por Sanhua",          color: "var(--orange, #ef741b)" },
+  plataforma: { label: "Plataforma",   desc: "Sanhua heredado del OEM fabricante base",                color: "var(--brand, #1763ad)"  },
+};
+
+function OemTable() {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div className="oem">
+      <div className="oem-label">Fabricantes que equipan sus productos con componentes SANHUA</div>
+      <div className="oem-chips">
+        {OEM.map((m) => <span key={m} className="oem-chip">{m}</span>)}
+      </div>
+
+      <button className="oem-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        {open ? "Ocultar detalle ▲" : "Ver relación OEM por marca ▼"}
+      </button>
+
+      {open && (
+        <div className="oem-table-wrap">
+          <table className="oem-table">
+            <thead>
+              <tr>
+                <th>Marca</th>
+                <th>Componentes Sanhua</th>
+                <th>Segmento en Argentina</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {OEM_DETALLE.map((r) => (
+                <tr key={r.marca}>
+                  <td>
+                    <span className="oem-row-brand">
+                      <span className="oem-av" style={{ background: `hsl(${r.hue} 60% 88%)`, color: `hsl(${r.hue} 50% 28%)` }}>{r.ini}</span>
+                      <b>{r.marca}</b>
+                    </span>
+                  </td>
+                  <td className="oem-td-comp">{r.componentes}</td>
+                  <td className="oem-td-seg">{r.segmento}</td>
+                  <td>
+                    <span className="oem-tipo" data-tipo={r.tipo}>{TIPO_META[r.tipo].label}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="oem-table-leyenda">
+            {Object.entries(TIPO_META).map(([k, v]) => (
+              <span key={k} className="oem-ley-item">
+                <span className="oem-tipo" data-tipo={k}>{v.label}</span>
+                <span className="oem-ley-desc">{v.desc}</span>
+              </span>
+            ))}
+          </div>
+          <p className="oem-table-note">
+            Las marcas mencionadas son propiedad de sus respectivos dueños. Su referencia es exclusivamente a fines de compatibilidad técnica y no implica afiliación ni respaldo comercial.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const Header = ({ onLogo, cartCount = 0, onCart }) => (
   <React.Fragment>
     <div className="topbar">
@@ -125,44 +192,6 @@ const Home = ({ go, goApp, openApp }) => (
       </div>
     </section>
 
-    {/* CONOCÉ LOS COMPONENTES */}
-    <section className="block">
-      <h2 className="block-title">Conocé cada componente</h2>
-      <p className="block-sub">Qué hace cada pieza SANHUA y dónde se ubica dentro de tu equipo.</p>
-      <div className="grid comp-grid">
-        {COMPONENTES_INFO.map((c) => {
-          const img = prodImg(c.categoria, null, c.nombre);
-          return (
-          <article key={c.id} className="comp-card">
-            <div className={"comp-iso" + (img ? " comp-iso--photo" : "")} role="img" aria-label={c.iso}>
-              {img
-                ? <img className="comp-iso-img" src={img} alt={c.nombre} />
-                : <React.Fragment>
-                    <span className="comp-iso-ico"><PartIcon categoria={c.categoria} size={30} /></span>
-                    <span className="comp-iso-label">{c.iso}</span>
-                  </React.Fragment>
-              }
-            </div>
-            <div className="comp-body">
-              <div className="comp-head">
-                <span className="comp-ico"><PartIcon categoria={c.categoria} size={22} /></span>
-                <h3 className="comp-name">{c.nombre}</h3>
-              </div>
-              <div className="comp-block">
-                <span className="comp-k">Función principal</span>
-                <p className="comp-t">{c.funcion}</p>
-              </div>
-              <div className="comp-block comp-loc">
-                <span className="comp-k"><IconMapPin size={14} /> Ubicación</span>
-                <p className="comp-t">{c.ubicacion}</p>
-              </div>
-            </div>
-          </article>
-          );
-        })}
-      </div>
-    </section>
-
     {/* SANHUA — EL FABRICANTE */}
     <section className="block band">
       <div className="band-head">
@@ -185,13 +214,7 @@ const Home = ({ go, goApp, openApp }) => (
         ))}
       </div>
 
-      <div className="oem">
-        <div className="oem-label">Fabricantes que equipan sus productos con componentes SANHUA</div>
-        <div className="oem-chips">
-          {OEM.map((m) => <span key={m} className="oem-chip">{m}</span>)}
-        </div>
-        <div className="oem-note">Marcas mencionadas solo a fines de compatibilidad. No representan vínculo comercial.</div>
-      </div>
+      <OemTable />
 
       <div className="band-cta">
         <button className="btn btn-primary btn-lg" onClick={go}>
@@ -212,7 +235,21 @@ const Footer = () => (
       <div className="footer-certs">
         {CERTS.map((c) => <span key={c} className="cert">{c}</span>)}
       </div>
-      <div className="footer-legal">Prototipo demostrativo · Repuestos HVAC/R · No es un sitio comercial real</div>
+      <div className="footer-legal">
+        <p>
+          <b>Aviso legal:</b> Este sitio fue desarrollado con asistencia de inteligencia artificial con fines demostrativos.
+          La información presentada (códigos de producto, compatibilidades, equivalencias y relaciones OEM) se basa en
+          fuentes públicas y puede contener inexactitudes o estar desactualizada. <b>Verificá siempre los datos con el
+          distribuidor oficial antes de realizar una compra o reparación.</b>
+        </p>
+        <p>
+          Las marcas comerciales mencionadas (Daikin, LG, Samsung, Gree, Carrier, Midea, Hisense, BGH, Philco, y otras)
+          son propiedad de sus respectivos dueños. Su mención es exclusivamente a fines de indicar compatibilidad técnica
+          y no implica ninguna afiliación, patrocinio ni relación comercial con dichas empresas.
+          SANHUA y su logotipo son marcas registradas de Sanhua International Inc.
+        </p>
+        <p className="footer-ai">✦ Contenido generado con asistencia de IA · Sujeto a cambios sin previo aviso · No constituye asesoramiento técnico profesional</p>
+      </div>
     </div>
   </footer>
 );

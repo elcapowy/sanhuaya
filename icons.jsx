@@ -28,6 +28,7 @@ const IconWhatsApp = (p) => <Icon {...p}><path d="M4 20l1.4-4A8 8 0 1112 20a8 8 
 const IconChevron = (p) => <Icon {...p}><path d="M9 6l6 6-6 6" /></Icon>;
 const IconReverse = (p) => <Icon {...p}><path d="M4 9h13l-3-3M20 15H7l3 3" /></Icon>;
 const IconBolt = (p) => <Icon {...p}><path d="M13 3L5 13h6l-1 8 8-10h-6z" /></Icon>;
+const IconFridge = (p) => <Icon {...p}><rect x="6" y="3" width="12" height="18" rx="2" /><line x1="6" y1="10" x2="18" y2="10" /><line x1="15" y1="6" x2="15" y2="8" /><line x1="15" y1="13" x2="15" y2="17" /></Icon>;
 const IconThermo = (p) => <Icon {...p}><path d="M12 4a2 2 0 014 0v9a4 4 0 11-4 0z" fill="none" /><circle cx="14" cy="17" r="1.4" fill="currentColor" stroke="none" /></Icon>;
 const IconValve = (p) => <Icon {...p}><circle cx="12" cy="13" r="5" /><path d="M12 8V3M9 3h6" /></Icon>;
 const IconPlus = (p) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>;
@@ -40,7 +41,7 @@ const ICONS = {
   search: IconSearch, wind: IconWind, gauge: IconGauge, snowflake: IconSnowflake,
   filter: IconFilter, wrench: IconWrench, factory: IconFactory, globe: IconGlobe,
   award: IconAward, shield: IconShield, truck: IconTruck, clipboard: IconClipboard,
-  phone: IconPhone, whatsapp: IconWhatsApp, check: IconCheck, bolt: IconBolt, box: IconBox, unit: IconUnit,
+  phone: IconPhone, whatsapp: IconWhatsApp, check: IconCheck, bolt: IconBolt, box: IconBox, unit: IconUnit, fridge: IconFridge,
 };
 
 // Ícono técnico por categoría de componente
@@ -58,6 +59,6 @@ Object.assign(window, {
   IconPhone, IconMapPin, IconTruck, IconWrench, IconWind, IconGauge, IconFilter,
   IconSnowflake, IconFactory, IconGlobe, IconAward, IconShield, IconClipboard,
   IconWhatsApp, IconChevron, IconReverse, IconBolt, IconThermo, IconValve, IconPlus, IconX,
-  IconBox, IconUnit,
+  IconBox, IconUnit, IconFridge,
   ICONS, PART_ICONS, PartIcon,
 });
