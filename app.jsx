@@ -24,16 +24,19 @@ function getRecomendaciones(carrito) {
     });
   }
 
-  // Abrir el circuito sellado → filtro obligatorio
+  // Filtro deshidratador → SIEMPRE con cualquier reemplazo
+  const yaHayFiltro = cats.has('filter') || inCart(/filtro|deshidratador|dtg|stgb|bgq|kgq/);
   const abreCircuito = ['reversing', 'valve', 'solenoid'].some(c => cats.has(c));
-  if (abreCircuito && !cats.has('filter') && !inCart(/filtro|deshidratador|dtg|stgb|bgq|kgq/)) {
+  if (!yaHayFiltro && carrito.length > 0) {
     recs.push({
-      key: 'filter-circuit', urgencia: 'alta',
+      key: 'filter-circuit', urgencia: abreCircuito ? 'alta' : 'media',
       nombre: 'Filtro deshidratador',
       codigo: 'DTG-E / STGB bidireccional · R32 / R410A / R22',
       categoria: 'filter',
       icono: '⚠️',
-      razon: 'Regla de oro: cada vez que se abre el circuito de gas, el filtro deshidratador se reemplaza. La humedad que entra destruye el compresor en pocas horas de operación. Es la pieza más barata de la reparación.',
+      razon: abreCircuito
+        ? 'Regla de oro: cada vez que se abre el circuito de gas, el filtro deshidratador se reemplaza. La humedad que entra destruye el compresor en pocas horas de operación. Es la pieza más barata de la reparación.'
+        : 'Con cualquier intervención en la unidad, es buena práctica renovar el filtro deshidratador. Si tiene más de 2 años de uso puede estar cerca de su límite de absorción.',
     });
   }
 
@@ -58,18 +61,6 @@ function getRecomendaciones(carrito) {
       categoria: 'solenoid',
       icono: '💡',
       razon: 'Si el forzador falló por sobrecarga, puede que la compuerta esté trabada o el motor forzado. Revisarla en la misma visita evita que el forzador nuevo vuelva a sobrecargarse.',
-    });
-  }
-
-  // Bobina sola → filtro preventivo (técnico ya está en la unidad exterior)
-  if (cats.has('coil') && !cats.has('filter') && !abreCircuito && !inCart(/filtro|deshidratador/)) {
-    recs.push({
-      key: 'filter-preventive', urgencia: 'baja',
-      nombre: 'Filtro deshidratador bidireccional',
-      codigo: 'STGB · R32 / R410A — bidireccional',
-      categoria: 'filter',
-      icono: '🔧',
-      razon: 'El técnico ya va a estar en la unidad exterior. En equipos con más de 3 años es buena práctica revisar el filtro: si está colmatado afecta el rendimiento del ciclo completo.',
     });
   }
 
