@@ -69,6 +69,64 @@ function OemTable() {
   );
 }
 
+// ── Video del hero con control de sonido (muted por defecto para autoplay) ──
+function HeroVideo() {
+  const ref = React.useRef(null);
+  const [muted, setMuted] = React.useState(true);
+  const [played, setPlayed] = React.useState(false);
+
+  const toggleSound = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (muted) {
+      // Primera vez: reiniciar desde el comienzo y reproducir con sonido
+      v.muted = false;
+      if (!played) { v.currentTime = 0; setPlayed(true); }
+      v.play().catch(() => {});
+      setMuted(false);
+    } else {
+      v.muted = true;
+      setMuted(true);
+    }
+  };
+
+  // Cuando termina el video, volver a silencio
+  const handleEnded = () => {
+    if (ref.current) { ref.current.muted = true; }
+    setMuted(true);
+    setPlayed(false);
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <video
+        ref={ref}
+        className="hero-video"
+        src={(window.__resources || {}).heroVideo || "assets/sanhua-video.mp4"}
+        autoPlay
+        muted
+        playsInline
+        poster={(window.__resources || {}).anuncioPng || "assets/sanhua-anuncio.png"}
+        onEnded={handleEnded}
+      />
+      <button
+        onClick={toggleSound}
+        aria-label={muted ? "Activar sonido" : "Silenciar"}
+        style={{
+          position: 'absolute', bottom: '12px', right: '12px',
+          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%',
+          width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#fff', fontSize: '17px', lineHeight: 1,
+          transition: 'background .2s',
+        }}
+      >
+        {muted ? '🔇' : '🔊'}
+      </button>
+    </div>
+  );
+}
+
 const Header = ({ onLogo, cartCount = 0, onCart }) => (
   <React.Fragment>
     <div className="topbar">
@@ -125,8 +183,7 @@ const Home = ({ go, goApp, openApp }) => (
       </div>
       <div className="hero-visual">
         <div className="hero-video-frame">
-          <video className="hero-video" src={(window.__resources||{}).heroVideo||"assets/sanhua-video.mp4"}
-            autoPlay muted loop playsInline poster={(window.__resources||{}).anuncioPng||"assets/sanhua-anuncio.png"} />
+          <HeroVideo />
           <span className="hero-video-tag"><span className="pill-dot" /> Componente original de fábrica</span>
         </div>
         <span className="float f1" aria-hidden="true"><IconWrench size={20} /></span>
@@ -225,7 +282,139 @@ const Home = ({ go, goApp, openApp }) => (
   </div>
 );
 
-const Footer = () => (
+// ── Exportar solicitudes a XLSX ───────────────────────────────────────────
+function exportarXLS(lista) {
+  if (!lista.length) return;
+  const XLSX = window.XLSX;
+
+  // Hoja 1 — Resumen clientes
+  const resumen = lista.map(s => ({
+    'Fecha':        s.fecha,
+    'Nombre':       s.cliente.nombre,
+    'WhatsApp':     s.cliente.tel,
+    'Ciudad':       s.cliente.ciudad,
+    'Dirección':    s.cliente.direccion || '',
+    'Nota':         s.cliente.nota || '',
+    'Cant. repuestos': s.carrito.length,
+    'Repuestos':    s.carrito.map(c => c.componente).join(' | '),
+  }));
+
+  // Hoja 2 — Detalle por ítem
+  const detalle = lista.flatMap(s =>
+    s.carrito.map(c => ({
+      'Fecha':        s.fecha,
+      'Cliente':      s.cliente.nombre,
+      'WhatsApp':     s.cliente.tel,
+      'Ciudad':       s.cliente.ciudad,
+      'Componente':   c.componente,
+      'Código Sanhua': c.codigoSanhua,
+      'Código OEM':   c.codigoOEM || '',
+      'Marca equipo': c.marca,
+      'Serie':        c.serie || '',
+      'Cantidad':     c.cantidad,
+    }))
+  );
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen),  'Solicitudes');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle),  'Detalle repuestos');
+
+  const fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `SANHUA-YA-solicitudes-${fecha}.xlsx`);
+}
+
+// ── Panel de solicitudes guardadas ───────────────────────────────────────
+function SolicitudesPanel() {
+  const [lista, setLista] = React.useState([]);
+  const [sel, setSel] = React.useState(null);
+
+  React.useEffect(() => {
+    try {
+      const data = JSON.parse(localStorage.getItem('sanhua_ya_solicitudes') || '[]');
+      setLista(data);
+    } catch(e) { setLista([]); }
+  }, []);
+
+  const borrar = (id) => {
+    const nueva = lista.filter(s => s.id !== id);
+    setLista(nueva);
+    localStorage.setItem('sanhua_ya_solicitudes', JSON.stringify(nueva));
+    if (sel?.id === id) setSel(null);
+  };
+
+  if (lista.length === 0) return (
+    <div className="sol-empty">
+      <span style={{fontSize:'40px'}}>📋</span>
+      <p>No hay solicitudes guardadas en este dispositivo todavía.</p>
+    </div>
+  );
+
+  return (
+    <div className="sol-wrap">
+      <div className="sol-list">
+        <div className="sol-toolbar">
+          <span className="sol-total">{lista.length} solicitud{lista.length !== 1 ? 'es' : ''}</span>
+          <button className="btn btn-outline btn-sm sol-export" onClick={() => exportarXLS(lista)}>
+            ↓ Exportar XLS
+          </button>
+        </div>
+        {lista.map((s) => (
+          <button key={s.id} className={"sol-row" + (sel?.id === s.id ? ' sel' : '')} onClick={() => setSel(s)}>
+            <div className="sol-row-top">
+              <span className="sol-nombre">{s.cliente.nombre}</span>
+              <span className="sol-fecha">{s.fecha}</span>
+            </div>
+            <div className="sol-row-bot">
+              <span className="sol-tel">{s.cliente.tel}</span>
+              <span className="sol-ciudad">{s.cliente.ciudad}</span>
+              <span className="sol-count">{s.carrito.length} rep.</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {sel && (
+        <div className="sol-detail">
+          <div className="sol-detail-head">
+            <span className="sol-detail-title">{sel.cliente.nombre}</span>
+            <button className="sol-del" onClick={() => borrar(sel.id)} title="Eliminar">🗑</button>
+          </div>
+          <div className="sol-detail-fields">
+            <div className="sol-field"><span>WhatsApp</span><b>{sel.cliente.tel}</b></div>
+            <div className="sol-field"><span>Ciudad</span><b>{sel.cliente.ciudad}</b></div>
+            {sel.cliente.direccion && <div className="sol-field"><span>Dirección</span><b>{sel.cliente.direccion}</b></div>}
+            {sel.cliente.nota && <div className="sol-field"><span>Nota</span><b>{sel.cliente.nota}</b></div>}
+            <div className="sol-field"><span>Fecha</span><b>{sel.fecha}</b></div>
+          </div>
+          <div className="sol-items">
+            {sel.carrito.map((c, i) => (
+              <div key={i} className="sol-item">
+                <span className="sol-item-n">{c.cantidad}×</span>
+                <div>
+                  <div className="sol-item-nombre">{c.componente}</div>
+                  <div className="sol-item-cod">{c.codigoSanhua}</div>
+                  <div className="sol-item-eq">{[c.marca, c.serie].filter(Boolean).join(' · ')}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <a
+            className="btn btn-wpp btn-block"
+            href={'https://wa.me/5491100000000?text=' + encodeURIComponent(
+              ['Seguimiento solicitud — ' + sel.fecha, '', 'Cliente: ' + sel.cliente.nombre, 'Tel: ' + sel.cliente.tel, 'Ciudad: ' + sel.cliente.ciudad, '',
+               ...sel.carrito.map((c,i) => `${i+1}) ${c.componente} · ${c.codigoSanhua}`)].join('\n')
+            )}
+            target="_blank" rel="noopener noreferrer"
+          >
+            <IconWhatsApp size={16} /> Contactar por WhatsApp
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const Footer = ({ onAdmin }) => (
   <footer className="footer">
     <div className="container footer-in">
       <div className="footer-brand">
@@ -249,9 +438,10 @@ const Footer = () => (
           SANHUA y su logotipo son marcas registradas de Sanhua International Inc.
         </p>
         <p className="footer-ai">✦ Contenido generado con asistencia de IA · Sujeto a cambios sin previo aviso · No constituye asesoramiento técnico profesional</p>
+        {onAdmin && <button className="footer-admin-btn" onClick={onAdmin}>📋 Ver solicitudes</button>}
       </div>
     </div>
   </footer>
 );
 
-Object.assign(window, { Header, Home, Footer });
+Object.assign(window, { Header, Home, Footer, SolicitudesPanel });

@@ -6,7 +6,61 @@
 // ─────────────────────────────────────────────────────────────
 // Motor de recomendaciones inteligentes para el carrito
 // ─────────────────────────────────────────────────────────────
+// ── Helpers de códigos ──────────────────────────────────────────────────────
+// Divide "SH-F(L)3H12U-52 (V.4 vías) / SH-DTG-E05020 (filtro)" en chips
+function parseCodigos(raw) {
+  if (!raw) return [];
+  return raw.split(' / ').map(part => {
+    const m = part.trim().match(/^(.*)\s+\(([^)]+)\)$/);
+    return m ? { codigo: m[1].trim(), label: m[2].trim() } : { codigo: part.trim(), label: null };
+  });
+}
+
+function CodigosSh({ raw }) {
+  const partes = parseCodigos(raw);
+  return partes.map((p, i) => (
+    <span key={i} className="code code-sh">
+      <span className="code-k">{p.label || 'Sanhua'}</span>{p.codigo}
+    </span>
+  ));
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Inferir categoría desde etiqueta del código ────────────────────────────
+function inferCategoria(label, fallback) {
+  const l = (label || '').toLowerCase();
+  if (/filtro|filter|strainer|deshidratador|dtg|stgb/.test(l)) return 'filter';
+  if (/solenoid/.test(l)) return 'solenoid';
+  if (/4 v[ií]as|v\.4|4-way|inversora/.test(l)) return 'reversing';
+  if (/vee|válvula exp|electronic exp|eev|dpf|lpf/.test(l)) return 'valve';
+  if (/llave|serv\.|service|stop valve|ball/.test(l)) return 'service';
+  if (/bobina|coil|pq-m/.test(l)) return 'coil';
+  if (/sensor|ntc|termistor/.test(l)) return 'sensor';
+  return fallback;
+}
+
+// ── Separar ítems combinados (filtro + solenoide, etc.) en cards individuales ──
+function splitItem(it) {
+  const partes = parseCodigos(it.codigoSanhua);
+  const shouldSplit = partes.length >= 2 && partes.every(p => p.label);
+  if (!shouldSplit) return [it];
+  return partes.map(p => ({
+    ...it,
+    componente: p.label,
+    codigoSanhua: p.codigo,
+    categoria: inferCategoria(p.label, it.categoria),
+    _parentComponente: it.componente,
+    _isSplit: true,
+  }));
+}
+
 function getRecomendaciones(carrito) {
+  // No aplica para heladeras ni aplicaciones no-HVAC
+  const esNoHVAC = carrito.every(c => /heladera|freezer|frig|lavarrop|lavavajill/i.test(c.marca));
+  if (esNoHVAC) return [];
+
+  // El Kit SEK ya incluye NTC — no sugerirlo
+  const tieneSEK = carrito.some(c => /sek/i.test(c.item.codigoSanhua || '') || /kit\s*sek/i.test(c.item.componente || ''));
   const cats = new Set(carrito.map(c => c.item.categoria));
   const comps = carrito.map(c => [c.item.componente, c.item.codigoSanhua, c.item.nota || ''].join(' ')).join(' ').toLowerCase();
   const inCart = (re) => re.test(comps);
@@ -64,8 +118,8 @@ function getRecomendaciones(carrito) {
     });
   }
 
-  // Válvula de expansión → sensor NTC de tubería (calibrar subenfriamiento)
-  if (cats.has('valve') && !cats.has('sensor') && !inCart(/sensor|termistor|ntc/)) {
+  // Válvula de expansión → sensor NTC (no si ya hay SEK kit que lo incluye)
+  if (cats.has('valve') && !cats.has('sensor') && !inCart(/sensor|termistor|ntc/) && !tieneSEK) {
     recs.push({
       key: 'sensor-with-valve', urgencia: 'media',
       nombre: 'Sensor NTC de tubería',
@@ -76,7 +130,45 @@ function getRecomendaciones(carrito) {
     });
   }
 
-  return recs.slice(0, 3);
+  // VEE/DPF → sugerir bobina correcta según tamaño
+  const dpfCodes = carrito.map(c => c.item.codigoSanhua || '').join(' ').toLowerCase();
+  const hasDPF = /dpf/.test(dpfCodes);
+  if (hasDPF && !inCart(/dpf-5800[12]|pq-m10|pq-m03/)) {
+    const hasBig   = /dpf\(s03\)/.test(dpfCodes);
+    const hasSmall = /dpf\((t01|ts1)\)/.test(dpfCodes) || (hasDPF && !hasBig);
+    if (hasBig) recs.push({
+      key: 'coil-dpf-s03', urgencia: 'alta',
+      nombre: 'Bobina PQ-M03 — VEE DPF(S03)',
+      codigo: 'DPF-58002',
+      categoria: 'coil', icono: '🔌',
+      razon: 'La válvula DPF(S03) de 4.0–6.5C requiere la bobina PQ-M03 (DPF-58002). 5 hilos: naranja A, rojo B, amarillo Ā, negro B̄, gris COM.',
+    });
+    if (hasSmall) recs.push({
+      key: 'coil-dpf-ts1', urgencia: 'alta',
+      nombre: 'Bobina PQ-M10 — VEE DPF(T01/TS1)',
+      codigo: 'DPF-58001',
+      categoria: 'coil', icono: '🔌',
+      razon: 'La válvula DPF(T01/TS1) de 1.3–3.2C requiere la bobina PQ-M10 (DPF-58001). 5 hilos: naranja A, rojo B, amarillo Ā, negro B̄, gris COM.',
+    });
+  }
+
+  // Kit SEK → ofrecer sonda NTC adicional y filtro como accesorios
+  if (tieneSEK) {
+    const sekItem = carrito.find(c => /sek/i.test(c.item.codigoSanhua || '') || /kit\s*sek/i.test(c.item.componente || ''));
+    const accesorios = (sekItem?.item?.kitAccesorios) || [];
+    accesorios.forEach((a, i) => {
+      if (!inCart(new RegExp(a.codigoSanhua.split('/')[0].trim(), 'i')))
+        recs.push({
+          key: 'sek-acc-' + i, urgencia: i === 1 ? 'alta' : 'media',
+          nombre: a.componente, codigo: a.codigoSanhua, categoria: a.categoria, icono: i === 0 ? '🌡️' : '⚠️',
+          razon: i === 0
+            ? 'Sonda NTC de repuesto para el Kit SEK. La sonda viene incluida en el kit original; tener una extra evita paradas si se daña o necesita reubicarse.'
+            : 'Al instalar el Kit SEK se abre el circuito de gas — regla de oro: cambiar el filtro deshidratador para proteger el compresor.',
+        });
+    });
+  }
+
+  return recs.slice(0, 4);
 }
 
 function RecomendacionesSection({ carrito, onAgregar }) {
@@ -95,7 +187,7 @@ function RecomendacionesSection({ carrito, onAgregar }) {
               <span className="rec-ico">{r.icono}</span>
               <div className="rec-card-body">
                 <span className="rec-nombre">{r.nombre}</span>
-                <span className="codes"><span className="code code-sh"><span className="code-k">Sanhua</span>{r.codigo}</span></span>
+                <span className="codes"><CodigosSh raw={r.codigo} /></span>
               </div>
               <button className="rec-add-btn" onClick={() => onAgregar(r)}>
                 <IconPlus size={14} /> Agregar
@@ -121,8 +213,11 @@ function App() {
   const [filtroCat, setFiltroCat] = useState("Todos");
   const [appSel, setAppSel] = useState(null); // aplicación elegida (flujo por aplicación)
   const [appFrom, setAppFrom] = useState(0); // a dónde vuelve el back del detalle de aplicación
+  const [cablesFrom, setCablesFrom] = useState(4); // a dónde vuelve el back de la guía de cables
   const [carrito, setCarrito] = useState([]); // [{ marca, serie, modelos, item, cantidad }]
-  const [pedido, setPedido] = useState({ nombre: "", tel: "", direccion: "", ciudad: "", nota: "" });
+  const [pedido, setPedido] = useState({ nombre: "", tel: "", confirmTel: "", direccion: "", ciudad: "", nota: "" });
+  const [touched, setTouch] = useState({ nombre: false, tel: false, confirmTel: false, ciudad: false });
+  const touch = (f) => setTouch(p => ({ ...p, [f]: true }));
 
   const mt = (s, it) => matchTipo(tipo, s, it);
   const tipoNombre = (TIPOS.find((t) => t.id === tipo) || {}).nombre;
@@ -156,11 +251,49 @@ function App() {
     c.item === it ? { ...c, cantidad: Math.max(1, c.cantidad + d) } : c));
   const removeCart = (it) => setCarrito((prev) => prev.filter((c) => c.item !== it));
 
-  const formValido = pedido.nombre && pedido.tel && pedido.ciudad && carrito.length > 0;
+  // ── Helpers tecnología de expansión (exclusión mutua SEK / TXV / NTC) ──
+  const isKitSEK  = (it) => /SEK\d|Kit SEK|LPF.*kit|kit.*LPF/i.test([it.componente, it.codigoSanhua||''].join(' '));
+  const isTXV     = (it) => /RFGD|RFKH|termostat.*expan|expan.*termostat/i.test([it.componente, it.codigoSanhua||''].join(' '));
+  const isNTCSola = (it) => /sonda.*NTC|NTC.*sonda|Sonda NTC/i.test(it.componente) && !isKitSEK(it) && !isTXV(it);
+
+  const smartToggleCartCtx = (it, ctx) => {
+    if (inCart(it)) { removeCart(it); return; }
+    setCarrito(prev => {
+      let next = prev;
+      if (isKitSEK(it))  next = prev.filter(c => !isTXV(c.item) && !isNTCSola(c.item));
+      else if (isTXV(it)) next = prev.filter(c => !isKitSEK(c.item));
+      else if (isNTCSola(it) && prev.some(c => isKitSEK(c.item))) return prev;
+      return [...next, { marca: ctx.marca, serie: ctx.serie||'', modelos: ctx.modelos||'', item: it, cantidad: 1 }];
+    });
+  };
+
+  // Validación teléfono argentino (10 dígitos locales)
+  const normalizarTel = (t) => {
+    let d = t.replace(/\D/g, '');
+    if (d.startsWith('549')) d = d.slice(3);
+    else if (d.startsWith('54')) d = d.slice(2);
+    else if (d.startsWith('0')) d = d.slice(1);
+    return d;
+  };
+  const validarTel = (t) => normalizarTel(t).length === 10;
+  const validarNombre = (n) => n.trim().length >= 3 && !/^\d+$/.test(n.trim());
+  const validarCiudad = (c) => c.trim().length >= 2;
+
+  const errNombre    = touched.nombre    && !validarNombre(pedido.nombre)    ? 'Ingresá tu nombre completo (mín. 3 letras)' : null;
+  const errTel       = touched.tel       && pedido.tel       && !validarTel(pedido.tel)       ? 'Número inválido — debe tener 10 dígitos (ej: 11 5555-5555)' : null;
+  const errConfirm   = touched.confirmTel && pedido.confirmTel && pedido.confirmTel !== pedido.tel ? 'Los números no coinciden' : null;
+  const errCiudad    = touched.ciudad    && !validarCiudad(pedido.ciudad)    ? 'Indicá tu ciudad o localidad' : null;
+
+  const okNombre  = validarNombre(pedido.nombre);
+  const okTel     = validarTel(pedido.tel);
+  const okConfirm = pedido.confirmTel === pedido.tel && okTel;
+  const okCiudad  = validarCiudad(pedido.ciudad);
+
+  const formValido = okNombre && okTel && okConfirm && okCiudad && carrito.length > 0;
 
   const reset = () => {
     setStep(0); setTipo("todos"); setMarca(null); setSerie(null); setFiltroCat("Todos"); setAppSel(null);
-    setCarrito([]); setPedido({ nombre: "", tel: "", direccion: "", ciudad: "", nota: "" });
+    setCarrito([]); setPedido({ nombre: "", tel: "", confirmTel: "", direccion: "", ciudad: "", nota: "" }); setTouch({ nombre: false, tel: false, confirmTel: false, ciudad: false });
   };
 
   // Abrir una aplicación: las que dependen de marca van al flujo de marcas (part-to-part);
@@ -176,7 +309,9 @@ function App() {
     const L = ["Hola SANHUA YA, quiero cotizar estos repuestos:", ""];
     carrito.forEach((c, i) => {
       L.push(`${i + 1}) ${c.item.componente}${c.cantidad > 1 ? `  ×${c.cantidad}` : ""}`);
-      L.push(`   • Sanhua: ${c.item.codigoSanhua}`);
+      parseCodigos(c.item.codigoSanhua).forEach(p => {
+        L.push(`   • Sanhua${p.label ? ' (' + p.label + ')' : ''}: ${p.codigo}`);
+      });
       if (c.item.codigoOEM) L.push(`   • ${c.marca}: ${c.item.codigoOEM}`);
 
       const eq = [c.marca, c.serie].filter(Boolean).join(" · ");
@@ -191,6 +326,60 @@ function App() {
   };
 
   // El carrito flotante se muestra mientras se navega el catálogo
+  // ── Registro de solicitudes ──────────────────────────────────────────────
+  const guardarSolicitud = () => {
+    const registro = {
+      id: Date.now(),
+      fecha: new Date().toLocaleString('es-AR'),
+      cliente: { ...pedido },
+      carrito: carrito.map(c => ({
+        componente: c.item.componente,
+        codigoSanhua: c.item.codigoSanhua,
+        codigoOEM: c.item.codigoOEM || '',
+        marca: c.marca,
+        serie: c.serie,
+        cantidad: c.cantidad,
+      })),
+    };
+    try {
+      const prev = JSON.parse(localStorage.getItem('sanhua_ya_solicitudes') || '[]');
+      prev.unshift(registro);
+      localStorage.setItem('sanhua_ya_solicitudes', JSON.stringify(prev.slice(0, 200)));
+    } catch(e) {}
+    return registro;
+  };
+
+  const FORMSPREE = 'https://formspree.io/f/mlgkwvby';
+
+  const enviarSolicitud = () => {
+    const reg = guardarSolicitud();
+
+    // Enviar a Formspree (email)
+    const repuestosTexto = carrito.map((c, i) =>
+      `${i+1}) ${c.item.componente} ×${c.cantidad}\n   Sanhua: ${c.item.codigoSanhua}${c.item.codigoOEM ? `\n   ${c.marca}: ${c.item.codigoOEM}` : ''}\n   Equipo: ${[c.marca, c.serie].filter(Boolean).join(' · ')}`
+    ).join('\n\n');
+
+    fetch(FORMSPREE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        _subject: `🔧 Nueva solicitud SANHUA YA — ${pedido.nombre} (${pedido.ciudad})`,
+        Nombre:      pedido.nombre,
+        WhatsApp:    pedido.tel,
+        Ciudad:      pedido.ciudad,
+        Dirección:   pedido.direccion || '—',
+        Nota:        pedido.nota || '—',
+        Repuestos:   repuestosTexto,
+        Fecha:       reg.fecha,
+      }),
+    }).catch(() => {}); // silencioso si falla
+
+    // Abrir WhatsApp con todos los datos
+    const url = 'https://wa.me/5491100000000?text=' + encodeURIComponent(wppMsg());
+    window.open(url, '_blank', 'noopener');
+    setStep(6);
+  };
+
   const showCart = carrito.length > 0 && ((step >= 1 && step <= 4) || step === 10 || step === 11);
 
   return (
@@ -309,8 +498,14 @@ function App() {
               </div>
             )}
 
+            {items.some(it => /dpf|vee|válvula electrónica|electronic/i.test([it.codigoSanhua, it.componente, it.categoria].join(' '))) && (
+              <div className="hint" style={{marginBottom:'16px', cursor:'pointer'}} onClick={() => { setCablesFrom(4); setStep(12); }}>
+                <IconWrench size={15} /> <span>Esta serie incluye válvulas electrónicas — <b>ver guía de cables DPF</b></span>
+              </div>
+            )}
+
             <div className="list">
-              {items.map((it, i) => {
+              {items.flatMap(splitItem).map((it, i) => {
                 const added = inCart(it);
                 return (
                   <div key={i} className={"prod" + (added ? " sel" : "")}>
@@ -328,10 +523,18 @@ function App() {
                       </span>
                       <span className="prod-name">{it.componente}</span>
                       <span className="codes">
-                        <span className="code code-sh"><span className="code-k">Sanhua</span>{it.codigoSanhua}</span>
+                        <CodigosSh raw={it.codigoSanhua} />
                         {it.codigoOEM && <span className="code"><span className="code-k">{marca?.marca}</span>{it.codigoOEM}</span>}
 
                       </span>
+                      {it.kitContenido && (
+                        <div className="kit-includes">
+                          <span className="kit-includes-label">📦 Kit incluye:</span>
+                          <ul className="kit-includes-list">
+                            {it.kitContenido.map((k, i) => <li key={i}>{k}</li>)}
+                          </ul>
+                        </div>
+                      )}
                       {it.nota && <span className="prod-note">{it.nota}</span>}
                     </span>
                     <span className="prod-right">
@@ -384,11 +587,34 @@ function App() {
             }} />
 
             <div className="form">
-              <Field label="Nombre / Razón social" value={pedido.nombre} onChange={(v) => setPedido({ ...pedido, nombre: v })} placeholder="Ej: Refrigeración del Sur SRL" />
+              <Field
+                label="Nombre / Razón social" required
+                value={pedido.nombre} onChange={(v) => setPedido({ ...pedido, nombre: v })}
+                placeholder="Ej: Refrigeración del Sur SRL"
+                onBlur={() => touch('nombre')} error={errNombre} success={okNombre}
+              />
               <div className="form-2">
-                <Field label="Teléfono / WhatsApp" value={pedido.tel} onChange={(v) => setPedido({ ...pedido, tel: v })} placeholder="11 5555-5555" />
-                <Field label="Ciudad / Localidad" value={pedido.ciudad} onChange={(v) => setPedido({ ...pedido, ciudad: v })} placeholder="San Isidro, BA" />
+                <Field
+                  label="WhatsApp" required
+                  value={pedido.tel} onChange={(v) => setPedido({ ...pedido, tel: v })}
+                  placeholder="11 5555-5555" inputMode="tel"
+                  onBlur={() => touch('tel')} error={errTel} success={okTel}
+                  hint="10 dígitos sin el 0 ni el 15 (ej: 11 5555-5555)"
+                />
+                <Field
+                  label="Ciudad / Localidad" required
+                  value={pedido.ciudad} onChange={(v) => setPedido({ ...pedido, ciudad: v })}
+                  placeholder="San Isidro, BA"
+                  onBlur={() => touch('ciudad')} error={errCiudad} success={okCiudad}
+                />
               </div>
+              <Field
+                label="Confirmar WhatsApp" required
+                value={pedido.confirmTel} onChange={(v) => setPedido({ ...pedido, confirmTel: v })}
+                placeholder="Repetí tu número de WhatsApp" inputMode="tel"
+                onBlur={() => touch('confirmTel')} error={errConfirm} success={okConfirm}
+                hint="Asegurate de escribirlo igual para recibir la cotización"
+              />
               <Field label="Dirección de entrega (opcional)" value={pedido.direccion} onChange={(v) => setPedido({ ...pedido, direccion: v })} placeholder="Calle y número" />
               <div className="field">
                 <label className="field-label">Nota (opcional)</label>
@@ -400,7 +626,7 @@ function App() {
 
             <p className="hint"><IconWhatsApp size={15} /> Coordinamos precio, pago y entrega por WhatsApp.</p>
 
-            <button className="btn btn-primary btn-block" disabled={!formValido} onClick={() => setStep(6)}>
+            <button className="btn btn-primary btn-block" disabled={!formValido} onClick={enviarSolicitud}>
               Enviar solicitud <IconArrowRight size={18} />
             </button>
           </section>
@@ -423,7 +649,7 @@ function App() {
                   <span className="recap-body">
                     <span className="recap-name">{c.item.componente}</span>
                     <span className="recap-codes">
-                      <span className="code code-sh"><span className="code-k">Sanhua</span>{c.item.codigoSanhua}</span>
+                      <CodigosSh raw={c.item.codigoSanhua} />
                       {c.item.codigoOEM && <span className="code"><span className="code-k">{c.marca}</span>{c.item.codigoOEM}</span>}
                     </span>
                     <span className="recap-eq">{[c.marca, c.serie].filter(Boolean).join(" · ")}</span>
@@ -433,11 +659,70 @@ function App() {
             </div>
 
             <WppButton text="Adelantar consulta por WhatsApp" msg={wppMsg()} className="btn btn-wpp btn-block" />
-            <button className="btn btn-ghost btn-block" onClick={reset}>Hacer otra consulta</button>
+
+            {/* Accesorios sugeridos para kits */}
+            {(() => {
+              const comps = carrito.map(c => [c.item.codigoSanhua, c.item.componente].join(' ')).join(' ').toLowerCase();
+              const tieneSEK = /sek|lpf|vee|válvula.*electr|eev/i.test(comps);
+              const tieneTM  = /sh-tm0[12]|transformador.*24/i.test(comps);
+              const tieneSP  = /sh-sp01|supercap/i.test(comps);
+              if (!tieneSEK && !tieneTM) return null;
+              const accs = [];
+              if (!tieneTM) {
+                accs.push({ ...TM_TRANSFORMERS[0], img: (window.__resources||{}).prodTm01 || 'assets/prod-tm01.jpg', razon: 'El Kit SEK requiere 24 Vdc. El TM01 alimenta el controlador SEC612 en instalaciones de hasta 15 W.' });
+                accs.push({ ...TM_TRANSFORMERS[1], img: (window.__resources||{}).prodTm01 || 'assets/prod-tm01.jpg', razon: 'Para instalaciones más grandes o múltiples módulos (hasta 36 W / 1.5 A).' });
+              }
+              if (!tieneSP) {
+                accs.push({ modelo: SP01.modelo, codigo: SP01.codigo, salida: SP01.entrada, img: (window.__resources||{}).prodSp01 || 'assets/prod-sp01.jpg', razon: SP01.uso });
+              }
+              if (accs.length === 0) return null;
+              return (
+                <div className="rec-block" style={{textAlign:'left',marginTop:'24px'}}>
+                  <div className="rec-header">
+                    <span className="rec-title">Accesorios para tu kit</span>
+                    <span className="rec-sub">Completá la instalación — coordinamos todo en el mismo pedido</span>
+                  </div>
+                  <div className="rec-list">
+                    {accs.map((a, i) => (
+                      <div key={i} className="rec-card rec-card--alta">
+                        <div className="rec-card-top">
+                          <span className="rec-ico" style={{padding:0,width:'52px',height:'52px',flexShrink:0}}>
+                            <img src={a.img} alt={a.modelo} style={{width:'52px',height:'52px',objectFit:'contain',borderRadius:'6px'}} />
+                          </span>
+                          <div className="rec-card-body">
+                            <span className="rec-nombre">{a.modelo === 'SP01' ? 'SuperCap Module SP01' : 'Transformador ' + a.modelo}</span>
+                            <span className="codes"><CodigosSh raw={a.codigo} /></span>
+                          </div>
+                          <a
+                            className="rec-add-btn"
+                            href={'https://wa.me/5491100000000?text=' + encodeURIComponent('Hola SANHUA YA, quiero agregar a mi pedido:\n• ' + (a.modelo === 'SP01' ? 'SuperCap Module SP01' : 'Transformador ' + a.modelo) + ' — ' + a.codigo)}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{textDecoration:'none',display:'flex',alignItems:'center',gap:'4px'}}
+                          >
+                            <IconWhatsApp size={14} /> Pedir
+                          </a>
+                        </div>
+                        <p className="rec-razon">{a.razon}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <button className="btn btn-ghost btn-block" style={{marginTop:'12px'}} onClick={reset}>Hacer otra consulta</button>
           </section>
         )}
 
-        {/* STEP 10 — CATEGORÍAS DE APLICACIÓN */}
+        {/* STEP 99 — PANEL DE SOLICITUDES */}
+        {step === 99 && (
+          <section className="fade screen">
+            <BackBtn onClick={() => setStep(0)} />
+            <h2 className="screen-title">Solicitudes recibidas</h2>
+            <p className="screen-sub">Registro local de cotizaciones enviadas desde este dispositivo.</p>
+            <SolicitudesPanel />
+          </section>
+        )}
         {step === 10 && (
           <section className="fade screen">
             <BackBtn onClick={() => setStep(0)} />
@@ -486,10 +771,20 @@ function App() {
             </div>
 
             <div className="appd-list">
-              {(appSel?.repuestos || []).map((it, i) => {
-                const added = inCart(it);
-                return (
-                  <article key={i} className={"appd-card" + (added ? " sel" : "")}>
+              {(() => {
+                const _reps = appSel?.repuestos || [];
+                const _hasBoth = _reps.some(isKitSEK) && _reps.some(isTXV);
+                let _hdShown = false;
+                return _reps.map((it, i) => {
+                  const added = inCart(it);
+                  const _isExp = isKitSEK(it) || isTXV(it);
+                  const _showHd = _hasBoth && _isExp && !_hdShown && (_hdShown = true);
+                  return (<React.Fragment key={i}>
+                    {_showHd && (<div className="tech-choice-header">
+                      <span className="tech-choice-label">Tecnología de expansión — elegí una</span>
+                      <span className="tech-choice-sub">Kit SEK (electrónica) y TXV (termostática) son alternativas · no se usan juntas · <b>la electrónica ahorra 30–45 %</b></span>
+                    </div>)}
+                    <article className={"appd-card" + (added ? " sel" : "") + (isKitSEK(it) ? " card--sek" : "")}>
                     <div className={"appd-iso" + (prodImg(it.categoria, it.tipoLabel, it.componente) ? " appd-iso--photo" : "")} role="img" aria-label={it.iso || it.componente}>
                       {prodImg(it.categoria, it.tipoLabel, it.componente)
                         ? <img className="appd-iso-img" src={prodImg(it.categoria, it.tipoLabel, it.componente)} alt={it.componente} />
@@ -507,7 +802,7 @@ function App() {
                       <h3 className="appd-name">{it.componente}</h3>
                       {it.codigoSanhua && (
                         <span className="codes">
-                          <span className="code code-sh"><span className="code-k">Sanhua</span>{it.codigoSanhua}</span>
+                          <CodigosSh raw={it.codigoSanhua} />
                         </span>
                       )}
                       <div className="appd-block">
@@ -520,16 +815,53 @@ function App() {
                           <p className="comp-t">{it.ubicacion}</p>
                         </div>
                       )}
+                      {isKitSEK(it) && (
+                        <div className="sek-savings-banner">
+                          <span className="sek-sav-ico">⚡</span>
+                          <span><b>Ahorro 30–45 %</b> en consumo vs TXV termostática · recalentamiento electrónico preciso · mayor vida útil del compresor</span>
+                        </div>
+                      )}
+                      {(isTXV(it) || isNTCSola(it)) && carrito.some(c => isKitSEK(c.item)) && (
+                        <div className="sek-excl-note">{isNTCSola(it) ? 'La sonda NTC ya viene incluida en el Kit SEK.' : 'Con Kit SEK ya no necesitás TXV — seleccionarlo la reemplaza.'}</div>
+                      )}
                       <button className={"add-btn appd-add" + (added ? " on" : "")}
-                        onClick={() => toggleCartCtx(it, { marca: appSel.nombre, serie: "" })}>
+                        onClick={() => smartToggleCartCtx(it, { marca: appSel.nombre, serie: "" })}>
                         {added ? <React.Fragment><IconCheck size={15} /> Agregado a la cotización</React.Fragment>
                                : <React.Fragment><IconPlus size={15} /> Agregar a la cotización</React.Fragment>}
                       </button>
                     </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  </React.Fragment>);
+                });
+              })()}
             </div>
+
+            {/* Guía de cables DPF — acceso directo desde sección Eléctricos */}
+            {appSel?.id === 'electricos' && (
+              <div className="hint" style={{marginBottom:'16px', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}
+                onClick={() => { setCablesFrom(11); setStep(12); }}>
+                <IconWrench size={15} />
+                <span>Válvula electrónica DPF (heladeras) — <b>ver guía de cables y secuencia de excitación</b></span>
+              </div>
+            )}
+
+            {/* Diagrama interactivo del circuito (demo — todas las aplicaciones) */}
+            {typeof DiagramaApp !== 'undefined' && typeof DIAG_CONFIGS !== 'undefined' && DIAG_CONFIGS[appSel?.id] && (
+              <DiagramaApp
+                appId={appSel.id}
+                appNombre={appSel.nombre}
+                carrito={carrito}
+                onToggle={(n) => {
+                  const existente = carrito.find(c => {
+                    const cs = c.item.codigoSanhua || '';
+                    return (n.codigo || '').split(' · ').some(p => p.length > 2 && cs.includes(p.split(' ')[0]));
+                  });
+                  if (existente) { removeCart(existente.item); return; }
+                  const it = { componente: n.nombre, categoria: n.cat, codigoSanhua: n.codigo };
+                  smartToggleCartCtx(it, { marca: appSel.nombre, serie: '' });
+                }}
+              />
+            )}
 
             {/* Tabla de marcas compatibles (solo cuando la aplicación la tiene) */}
             {appSel?.marcas && appSel.marcas.length > 0 && (
@@ -565,6 +897,119 @@ function App() {
           </section>
           );
         })()}
+
+        {/* STEP 12 — GUÍA DE CABLES DPF */}
+        {step === 12 && (
+          <section className="fade screen narrow">
+            <BackBtn onClick={() => setStep(cablesFrom)} />
+            <h2 className="screen-title">Guía de cables — Bobinas DPF</h2>
+            <p className="screen-sub">Motor paso a paso de 5 hilos · series PQ-M10 y PQ-M03</p>
+
+            <div className="cables-section">
+              <h3 className="cables-h3">Compatibilidad válvula → bobina</h3>
+              <div className="cables-compat-table">
+                <div className="cables-compat-head">
+                  <span>Válvula</span><span>Serie bobina</span><span>Part number</span>
+                </div>
+                {DPF_COILS.map((c, i) => (
+                  <div key={i} className="cables-compat-row">
+                    <span className="cables-valve-range">{c.rango}</span>
+                    <span className="cables-coil-serie">{c.coilSerie}</span>
+                    <span className="code code-sh" style={{fontSize:'12px'}}><span className="code-k">Sanhua</span>{c.codigo}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="cables-section">
+              <h3 className="cables-h3">Color de cables</h3>
+              <div className="cables-color-list">
+                {DPF_CABLES.map((cable, i) => (
+                  <div key={i} className="cables-color-row">
+                    <span className="cables-terminal">
+                      {cable.barred ? <span style={{textDecoration:'overline'}}>{cable.terminal}</span> : cable.terminal}
+                    </span>
+                    <span className="cables-swatch" style={{background: cable.hex, border: cable.hex === '#1a1a1a' ? '1px solid #555' : 'none'}}></span>
+                    <span className="cables-color-name">{cable.color}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="cables-section">
+              <h3 className="cables-h3">Secuencia de excitación (8 pasos)</h3>
+              <div className="cables-exc-wrap">
+                <table className="cables-exc-table">
+                  <thead>
+                    <tr>
+                      <th>Cable</th>
+                      {[1,2,3,4,5,6,7,8].map(n => <th key={n}>{n}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DPF_EXCITACION.map((row, i) => (
+                      <tr key={i}>
+                        <td className="cables-exc-terminal">{row.terminal}</td>
+                        {row.pasos.map((p, j) => (
+                          <td key={j} className={"cables-exc-cell" + (p ? " on" : " off")}>{p ? "ON" : "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="cables-note">COM = polo común compartido por ambas bobinas. No conectar a tierra.</p>
+            </div>
+
+            <div className="cables-section">
+              <h3 className="cables-h3">Agregar bobina a la cotización</h3>
+              <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+                {DPF_COILS.map((c, i) => (
+                  <button key={i} className="btn btn-outline"
+                    onClick={() => {
+                      const it = { componente:'Bobina ' + c.coilSerie + ' para VEE DPF', categoria:'coil', codigoSanhua:c.codigo, nota:c.rango };
+                      if (!carrito.some(x => x.item.codigoSanhua === c.codigo))
+                        setCarrito(prev => [...prev, { marca:'Bobina DPF', serie:'', modelos:'', item:it, cantidad:1 }]);
+                      setStep(5);
+                    }}>
+                    Agregar {c.codigo}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="cables-section">
+              <h3 className="cables-h3">Transformadores 24 Vdc — TM01 / TM02</h3>
+              <p className="cables-note" style={{marginBottom:'12px'}}>Fuente de alimentación para el controlador SEC612 y compatibles. Entrada universal 85–264 VAC.</p>
+              <div className="cables-compat-table">
+                <div className="cables-compat-head" style={{gridTemplateColumns:'1fr 1fr 1fr 1fr'}}>
+                  <span>Modelo</span><span>Salida</span><span>Código</span><span>Uso típico</span>
+                </div>
+                {TM_TRANSFORMERS.map((t, i) => (
+                  <div key={i} className="cables-compat-row" style={{gridTemplateColumns:'1fr 1fr 1fr 1fr'}}>
+                    <span className="cables-valve-range"><b>{t.modelo}</b> · {t.dim}</span>
+                    <span className="cables-coil-serie">{t.salida}</span>
+                    <span className="code code-sh" style={{fontSize:'12px'}}><span className="code-k">Sanhua</span>{t.codigo}</span>
+                    <span style={{fontSize:'12px',color:'var(--fg-soft)'}}>{t.uso}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginTop:'14px'}}>
+                {TM_TRANSFORMERS.map((t, i) => (
+                  <button key={i} className="btn btn-outline"
+                    onClick={() => {
+                      const it = { componente:'Transformador ' + t.modelo + ' — 24 Vdc ' + t.salida, categoria:'solenoid', codigoSanhua:t.codigo, nota:t.uso };
+                      if (!carrito.some(x => x.item.codigoSanhua === t.codigo))
+                        setCarrito(prev => [...prev, { marca:'Accesorio VEE', serie:'', modelos:'', item:it, cantidad:1 }]);
+                      setStep(5);
+                    }}>
+                    Agregar {t.codigo}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       {/* Barra flotante de carrito */}
@@ -582,7 +1027,7 @@ function App() {
         </div>
       )}
 
-      <Footer />
+      <Footer onAdmin={() => setStep(99)} />
     </div>
   );
 }

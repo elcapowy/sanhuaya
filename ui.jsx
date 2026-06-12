@@ -1,10 +1,25 @@
 // Componentes auxiliares de UI
 
-const Field = ({ label, value, onChange, placeholder, type = "text" }) => (
+const Field = ({ label, value, onChange, placeholder, type = "text", error, success, hint, onBlur, inputMode, required }) => (
   <div className="field">
-    <label className="field-label">{label}</label>
-    <input className="field-input" type={type} value={value}
-      onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    <label className="field-label">
+      {label}
+      {required && <span className="field-req"> *</span>}
+    </label>
+    <div className="field-wrap">
+      <input
+        className={"field-input" + (error ? " field-input--error" : "") + (success ? " field-input--ok" : "")}
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        onBlur={onBlur}
+      />
+      {success && <span className="field-check">✓</span>}
+    </div>
+    {error   && <span className="field-error">{error}</span>}
+    {!error && hint && <span className="field-hint">{hint}</span>}
   </div>
 );
 

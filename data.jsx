@@ -129,6 +129,9 @@ const COMPONENTES_INFO = [
 // ─────────────────────────────────────────────────────────────
 const _WR = window.__resources || {};
 const _A = {
+  filterStg:   _WR.prodFilterStg   || "assets/prod-filter-stg.jpg",
+  filterDtge:  _WR.prodFilterDtge  || "assets/prod-filter-dtge.jpg",
+  tobera:      _WR.prodTobera      || "assets/prod-tobera.webp",
   reversing:   _WR.prodReversing   || "assets/prod-reversing.png",
   valve:       _WR.prodValve       || "assets/prod-valve.png",
   solenoid:    _WR.prodSolenoid    || "assets/prod-solenoid.png",
@@ -149,6 +152,12 @@ const _A = {
   sek:         _WR.prodSek         || "assets/prod-sek.png",
   eev:         _WR.prodEev         || "assets/prod-eev.png",
   core:        _WR.prodCore        || "assets/prod-core.png",
+  sec612:      _WR.prodSec612      || "assets/prod-sec612.webp",
+  bobinaMq:    _WR.prodBobinaMq    || "assets/prod-bobina-mq.webp",
+  ycqc:       _WR.prodYcqc       || "assets/prod-ycqc.png",
+  ycqb:        _WR.prodYcqb        || "assets/prod-ycqb.png",
+  tm01:        _WR.prodTm01        || "assets/prod-tm01.jpg",
+  sp01:        _WR.prodSp01        || "assets/prod-sp01.jpg",
 };
 
 const PRODUCT_IMAGES = {
@@ -166,13 +175,19 @@ const PRODUCT_IMAGES = {
   "Llave de servicio":  _A.serviceBall,
   "Válvula 3 vías":     _A.threeWay,
   "VEE / Kit SEK":      _A.sek,
-  "Orificio / tobera":  _A.valve,
+  "Orificio / tobera":  _A.tobera,
   "Núcleo recambiable": _A.core,
   "Núcleo / cartucho":  _A.core,
 };
 
 // Reglas por nombre de componente (más específicas que categoría)
 const PROD_IMG_RULES = [
+  { re: /\bSP01\b|supercap|supercapacitor/i,               img: _A.sp01       },
+  { re: /\bTM01\b|\bTM02\b|transformador.*24v|24v.*transform/i, img: _A.tm01    },
+  { re: /SEC61[0-9]|controlador.*recalent|superheat.*control/i, img: _A.sec612  },
+  { re: /\bMQ-[AD]|bobina.*mdf|mdf.*bobina|bobina.*solen/i,    img: _A.bobinaMq },
+  { re: /YCQC|transductor.*4.20|4.20.*mA/i,                 img: _A.ycqc       },
+  { re: /YCQB|transductor.*0.5|voltaje.*trans/i,             img: _A.ycqb       },
   { re: /bobina|coil/i,                                   img: _A.bobina      },
   { re: /JMK|TSA|magn[eé]tico.*puerta|puerta.*magn[eé]t/i, img: _A.jmk         },
   { re: /ZWF|[Ff]orzador|[Bb]rushless|[Vv]entilador.*DC|DC.*[Vv]entilador/i, img: _A.zwf26      },
@@ -184,6 +199,7 @@ const PROD_IMG_RULES = [
   { re: /núcleo|cartucho|SH48|HTG-A80/i,                  img: _A.core        },
   { re: /3 vías|3vias|KMV|doble mando/i,                  img: _A.threeWay    },
   { re: /electr[oó]nica|VEE|EEV/i,                        img: _A.eev         },
+  { re: /tobera|orificio|nozzle|RFKH/i,                  img: _A.tobera      },
   { re: /termostática|TXV/i,                              img: _A.valve       },
   { re: /4 vías|inversora|reversing/i,                    img: _A.reversing   },
   { re: /solenoide|solenoid/i,                            img: _A.solenoid    },
@@ -192,6 +208,8 @@ const PROD_IMG_RULES = [
   { re: /llave esférica|llave de bola|ball valve/i,       img: _A.serviceBall },
   { re: /llave.*servicio|service valve|stop valve/i,      img: _A.service     },
   { re: /válvula de servicio|válvula servicio/i,          img: _A.service     },
+  { re: /DTGE|DTG-E/i,                                   img: _A.filterDtge  },
+  { re: /\bSTG\b|STG[BEF]|DTG-L/i,                        img: _A.filterStg   },
   { re: /deshidratador|filter drier|secador/i,            img: _A.filter      },
   { re: /filtro|filter|strainer/i,                        img: _A.filter      },
   { re: /sensor|termistor|NTC|thermistor/i,               img: _A.sensor      },
@@ -207,7 +225,67 @@ function prodImg(categoria, tipoLabel, nombre) {
   return PRODUCT_IMAGES[categoria] || null;
 }
 
-Object.assign(window, { OEM, OEM_DETALLE, SANHUA_FACTS, CERTS, CAT_LABEL, BRAND_HUE, TIPOS, itemTipos, matchTipo, COMPONENTES_INFO, PRODUCT_IMAGES, PROD_IMG_RULES, prodImg });
+// ── SuperCap Module SP01 ──────────────────────────────────────────
+const SP01 = {
+  modelo: "SP01",
+  codigo: "SH-SP01",
+  nombre: "SuperCap Module SP01",
+  entrada: "24 Vdc · 40–80 mA",
+  salida: "24 Vdc · 500 mA",
+  cap: "2.5 F (supercapacitor interno)",
+  op: "-20 a +60 °C",
+  uso: "Mantiene la válvula de expansión electrónica en posición segura (o la cierra) ante un corte de tensión. Imprescindible en instalaciones críticas: cámaras, góndolas y rack con VEE LPF.",
+  ubicacion: "En paralelo con la salida del transformador TM01/TM02, antes del controlador SEC612.",
+};
+
+// ── Transformadores TM01 / TM02 — fuente 24 Vdc para controladores VEE ────────
+const TM_TRANSFORMERS = [
+  {
+    modelo: "TM01",
+    codigo: "SH-TM01",
+    salida: "24 Vdc · 0.63 A · 15.2 W",
+    entrada: "85–264 VAC · 47–63 Hz",
+    dim: "18 × 58.4 × 90 mm",
+    corrienteAC: "0.5 A / 115 VAC · 0.25 A / 230 VAC",
+    cable: "18–24 AWG (0.2–0.8 mm²)",
+    op: "-30 a +70 °C · 20–90 % HR",
+    uso: "Alimenta controladores SEC612 y similares en instalaciones de hasta ~15 W (1 VEE LPF pequeña o media)."
+  },
+  {
+    modelo: "TM02",
+    codigo: "SH-TM02",
+    salida: "24 Vdc · 1.5 A · 36 W",
+    entrada: "85–264 VAC · 47–63 Hz",
+    dim: "35 × 58.4 × 90 mm",
+    corrienteAC: "0.5 A / 115 VAC · 0.25 A / 230 VAC",
+    cable: "18–24 AWG (0.2–0.8 mm²)",
+    op: "-30 a +70 °C · 20–90 % HR",
+    uso: "Alimenta controladores SEC612 en instalaciones más grandes o cuando se alimentan varios módulos desde una sola fuente (hasta 36 W)."
+  },
+];
+
+// ── Bobinas y cables para válvulas DPF ──────────────────────────────────────
+const DPF_COILS = [
+  { rango: "DPF(T01) / DPF(TS1)  ·  1.3C a 3.2C", re: /DPF\((T01|TS1)\)/i, coilSerie: "PQ-M10", codigo: "DPF-58001",
+    dimVal: { F:82, G:40, H:30, d:"6.35–7.94", N:17.3 }, dimBob: { A:38.5, B:26.4, C:25.6, D:700, E:600 } },
+  { rango: "DPF(S03)  ·  4.0C a 6.5C",             re: /DPF\(S03\)/i,       coilSerie: "PQ-M03", codigo: "DPF-58002",
+    dimVal: { F:148, G:64.7, H:63.4, d:15.88,    N:35.3 }, dimBob: { A:67.5, B:42.4, C:33,   D:700, E:600 } },
+];
+const DPF_CABLES = [
+  { terminal:"A",   barred:false, color:"Naranja",  hex:"#E07820" },
+  { terminal:"B",   barred:false, color:"Rojo",     hex:"#CC1010" },
+  { terminal:"A",   barred:true,  color:"Amarillo", hex:"#E8C800" },
+  { terminal:"B",   barred:true,  color:"Negro",    hex:"#1a1a1a" },
+  { terminal:"COM", barred:false, color:"Gris",     hex:"#888888" },
+];
+const DPF_EXCITACION = [
+  { terminal:"A",  pasos:[1,1,0,0,0,0,0,1] },
+  { terminal:"B",  pasos:[0,1,1,1,0,0,0,0] },
+  { terminal:"Ā",  pasos:[0,0,0,1,1,1,0,0] },
+  { terminal:"B̄",  pasos:[0,0,0,0,0,1,1,1] },
+];
+
+Object.assign(window, { OEM, OEM_DETALLE, SANHUA_FACTS, CERTS, CAT_LABEL, BRAND_HUE, TIPOS, itemTipos, matchTipo, COMPONENTES_INFO, PRODUCT_IMAGES, PROD_IMG_RULES, prodImg, SP01, TM_TRANSFORMERS, DPF_COILS, DPF_CABLES, DPF_EXCITACION });
 
 // ─────────────────────────────────────────────────────────────
 // Catálogo por APLICACIÓN — repuestos Sanhua agrupados por dónde se usan.
@@ -280,6 +358,41 @@ const APLICACIONES = [
     desc: "Bobinas y actuadores",
     intro: "Los componentes eléctricos que la placa de control usa para accionar válvulas y leer temperaturas. Se reemplazan sin tocar el circuito de gas.",
     repuestos: [
+      { componente: "Transformador 24 Vdc — TM01 (15 W)", categoria: "solenoid",
+        codigoSanhua: "SH-TM01", gases: [],
+        aplicacion: "Fuente de alimentación 24 Vdc para el controlador de válvula de expansión electrónica (SEC612 y compatibles). Entrada universal 85–264 VAC. Potencia 15.2 W, corriente de salida 0.63 A. Para instalaciones con una VEE pequeña o media.",
+        ubicacion: "Montado en el tablero de la unidad condensadora o rack, cerca del controlador SEC612.",
+        iso: "Transformador TM01 · tablero de la unidad" },
+      { componente: "Transformador 24 Vdc — TM02 (36 W)", categoria: "solenoid",
+        codigoSanhua: "SH-TM02", gases: [],
+        aplicacion: "Fuente de alimentación 24 Vdc de mayor capacidad (36 W · 1.5 A). Para instalaciones con múltiples módulos o VEE grandes (LPF30 en adelante). Misma entrada universal 85–264 VAC.",
+        ubicacion: "Montado en el tablero de la unidad condensadora o rack, cerca del controlador SEC612.",
+        iso: "Transformador TM02 · tablero de la unidad" },
+      { componente: "Controlador de recalentamiento SEC612", categoria: "valve", tipoLabel: "Válvula electrónica",
+        codigoSanhua: "SEC612-R4", gases: [],
+        aplicacion: "Controlador electrónico de recalentamiento para válvulas de expansión electrónica (VEE serie LPF y DPF). Lee el transductor de presión (P-SENS) y la sonda NTC (T-SENS) y comanda el motor paso a paso de la válvula. Display LED, alimentación 24 Vdc (transformador TM01/TM02). Es el cerebro del Kit SEK — también se vende suelto como repuesto.",
+        ubicacion: "Montado en el tablero del rack o de la unidad condensadora, sobre riel DIN.",
+        iso: "SEC612 · tablero del rack" },
+      { componente: "SuperCap Module SP01 — respaldo 24 Vdc", categoria: "solenoid",
+        codigoSanhua: "SH-SP01", gases: [],
+        aplicacion: "Módulo supercapacitor que mantiene la válvula de expansión electrónica en posición segura (o la cierra) ante un corte de tensión. Imprescindible en instalaciones críticas: cámaras frigoríficas, góndolas y racks con VEE LPF. Entrada/salida 24 Vdc. Se conecta en paralelo con el transformador TM01/TM02 antes del controlador SEC612.",
+        ubicacion: "En paralelo con la salida del transformador TM01/TM02, en el tablero junto al controlador SEC612.",
+        iso: "SP01 · tablero junto al SEC612" },
+      { componente: "Transductor de presión YCQB — salida 0.5–3.5 V", categoria: "pressure",
+        codigoSanhua: "YCQB02L12-1 · YCQB02H01 · YCQB03H05 · YCQB05H01 · (ver rango por gas)", gases: ["R32","R410A","R404","R134a","CO2"],
+        aplicacion: "Transductor de presión con salida de tensión 0.5–3.5 V directamente compatible con los controladores Sanhua (SEC612, SEC61X). Alimentación 5 Vdc. Precisión ±0.8 % FS. Protección IP66/IP67. Disponible con conexión Flare 7/16\" o soldada ¼\", y cable Packard o XHP. El modelo recomendado para R32/R410A es YCQB02L con rango 0–20 bar.",
+        ubicacion: "En la línea de aspiración o descarga según el punto de medición. Conectar directo al controlador SEC612 sin amplificador.",
+        iso: "YCQB · línea de aspiración o descarga" },
+      { componente: "Transductor de presión YCQC — salida 4–20 mA", categoria: "pressure",
+        codigoSanhua: "YCQC02L18 · YCQC02L24 · YCQC03L05 · YCQC03L11 · (ver rango por gas)", gases: ["R32","R410A","R404","R134a","CO2"],
+        aplicacion: "Transductor de presión con salida de corriente 4–20 mA. Alimentación 10–30 Vdc. Precisión ±0.8 % FS. Protección IP65/IP66. Conector Packard estándar (el mismo que usa el Kit SEK). Adecuado para instalaciones con cableado largo o donde la señal de tensión puede degradarse. YCQC02L18 es el modelo incluido en los Kit SEK para refrigeración.",
+        ubicacion: "En la línea de aspiración. El cable Packard se conecta directo al controlador SEC612 o compatible.",
+        iso: "YCQC · línea de aspiración" },
+      { componente: "Cables Packard IP67 para YCQB / YCQC", categoria: "pressure",
+        codigoSanhua: "YCQB02-013251 (2 m) · YCQB02-013252 (5 m) · YCQB02-013253 (9 m) — 3 hilos XHP", gases: [],
+        aplicacion: "Cables de extensión IP67 para transductores YCQB y YCQC con conector Packard. Permiten alejar el transductor del tablero sin perder estanqueidad. Compatible con ambas series YCQB y YCQC.",
+        ubicacion: "Entre el transductor instalado en la línea y el controlador en el tablero.",
+        iso: "Cable Packard YCQB02 · extensión para transductor" },
       { componente: "Bobinas para válvulas / solenoide", categoria: "coil",
         codigoSanhua: "24 V · 220 V · Inverter (Kelvinator) · 4.5 / 3.5 W", gases: [],
         aplicacion: "Actuador magnético de la válvula inversora o solenoide. Se cambia ante una falla eléctrica sin desoldar caños.",
@@ -320,6 +433,8 @@ const APLICACIONES = [
       { componente: "VEE — Kit SEK (válvula de expansión electrónica)", categoria: "valve", tipoLabel: "VEE / Kit SEK",
         codigoSanhua: "SEK08-01 · SEK10-01 · SEK14-01 · SEK18-01 · SEK24-01 — LPF + SEC612", gases: ["R404", "R449", "R452", "R134a"],
         aplicacion: "Modernización de exhibidoras y góndolas: reemplaza la TXV por control electrónico de recalentamiento. Kit completo con VEE LPF, controlador SEC612, transductor YCQC02L18 y sonda NTC. Mejora eficiencia y reduce temperatura de conservación más estable.",
+        kitContenido: ["VEE serie LPF (válvula de expansión)", "Controlador SEC612", "Transductor de presión YCQC02L18 c/cable Packard", "Sonda NTC de temperatura"],
+        kitAccesorios: [{componente:"Sonda NTC adicional (repuesto)",codigoSanhua:"NTC-TM01 / NTC-TM02",categoria:"sensor"},{componente:"Filtro deshidratador (DTG-E)",codigoSanhua:"SH-DTG-E05020",categoria:"filter"},{componente:"Transformador 24 Vdc — TM01 (15 W)",codigoSanhua:"SH-TM01",categoria:"solenoid"},{componente:"Transformador 24 Vdc — TM02 (36 W)",codigoSanhua:"SH-TM02",categoria:"solenoid"},{componente:"SuperCap Module SP01",codigoSanhua:"SH-SP01",categoria:"solenoid"}],
         ubicacion: "La VEE se suelda a la entrada del evaporador de cada módulo exhibidor; el controlador va montado en el tablero del rack.",
         iso: "Kit SEK · exhibidora o góndola" },
     ],
@@ -352,6 +467,8 @@ const APLICACIONES = [
       { componente: "VEE — Kit SEK (válvula de expansión electrónica)", categoria: "valve", tipoLabel: "VEE / Kit SEK",
         codigoSanhua: "SEK10-01 · SEK14-01 · SEK18-01 · SEK24-01 · SEK30-01 · SEK32-01 — LPF series + SEC612", gases: ["R404", "R449", "R452", "R507"],
         aplicacion: "Kit llave en mano que reemplaza la TXV por control electrónico de recalentamiento. Incluye VEE serie LPF (muy bajo leakage <1 ml/min), controlador SEC612, transductor de presión YCQC02L18 con cable Packard y sonda NTC. Control más preciso = mayor eficiencia y protección del compresor.",
+        kitContenido: ["VEE serie LPF (válvula de expansión)", "Controlador SEC612", "Transductor de presión YCQC02L18 c/cable Packard", "Sonda NTC de temperatura"],
+        kitAccesorios: [{componente:"Sonda NTC adicional (repuesto)",codigoSanhua:"NTC-TM01 / NTC-TM02",categoria:"sensor"},{componente:"Filtro deshidratador (DTG-E)",codigoSanhua:"SH-DTG-E05020",categoria:"filter"},{componente:"Transformador 24 Vdc — TM01 (15 W)",codigoSanhua:"SH-TM01",categoria:"solenoid"},{componente:"Transformador 24 Vdc — TM02 (36 W)",codigoSanhua:"SH-TM02",categoria:"solenoid"},{componente:"SuperCap Module SP01",codigoSanhua:"SH-SP01",categoria:"solenoid"}],
         ubicacion: "La VEE (LPF) se suelda a la entrada del evaporador de la cámara; el controlador SEC612 se monta en el tablero; la sonda NTC se fija a la línea de aspiración.",
         iso: "Kit SEK · evaporador de la cámara" },
       { componente: "VEE serie LPF (válvula sola)", categoria: "valve", tipoLabel: "Válvula electrónica",
@@ -389,6 +506,8 @@ const APLICACIONES = [
       { componente: "VEE serie LPF — Kit SEK (expansión electrónica)", categoria: "valve", tipoLabel: "VEE / Kit SEK",
         codigoSanhua: "SEK14-01 · SEK18-01 · SEK24-01 · SEK30-01 · SEK32-01 · SEK45-01 — LPF + SEC612", gases: ["R404", "R449", "R452", "R507"],
         aplicacion: "Válvula de expansión electrónica para condensadoras de alta eficiencia. Reemplaza la TXV para control más preciso del recalentamiento con variación de carga. Kit SEK incluye VEE LPF, controlador SEC612, transductor YCQC02L18 y sonda NTC.",
+        kitContenido: ["VEE serie LPF (válvula de expansión)", "Controlador SEC612", "Transductor de presión YCQC02L18 c/cable Packard", "Sonda NTC de temperatura"],
+        kitAccesorios: [{componente:"Sonda NTC adicional (repuesto)",codigoSanhua:"NTC-TM01 / NTC-TM02",categoria:"sensor"},{componente:"Filtro deshidratador (DTG-E)",codigoSanhua:"SH-DTG-E05020",categoria:"filter"}],
         ubicacion: "En la línea de líquido a la salida de la condensadora, antes de la entrada al evaporador.",
         iso: "VEE LPF · línea de líquido condensadora" },
     ],
