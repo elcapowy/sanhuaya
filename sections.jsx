@@ -400,7 +400,7 @@ function SolicitudesPanel() {
           </div>
           <a
             className="btn btn-wpp btn-block"
-            href={'https://wa.me/5491100000000?text=' + encodeURIComponent(
+            href={'https://wa.me/5491134696124?text=' + encodeURIComponent(
               ['Seguimiento solicitud — ' + sel.fecha, '', 'Cliente: ' + sel.cliente.nombre, 'Tel: ' + sel.cliente.tel, 'Ciudad: ' + sel.cliente.ciudad, '',
                ...sel.carrito.map((c,i) => `${i+1}) ${c.componente} · ${c.codigoSanhua}`)].join('\n')
             )}

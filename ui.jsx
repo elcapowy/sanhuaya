@@ -65,7 +65,7 @@ const StockTag = ({ stock }) => (
 
 // Botón WhatsApp reutilizable
 const WppButton = ({ text = "Consultar por WhatsApp", msg = "", className = "btn btn-wpp" }) => {
-  const href = "https://wa.me/5491100000000?text=" + encodeURIComponent(msg || "Hola, quiero consultar por un repuesto SANHUA.");
+  const href = "https://wa.me/5491134696124?text=" + encodeURIComponent(msg || "Hola, quiero consultar por un repuesto SANHUA.");
   return (
     <a className={className} href={href} target="_blank" rel="noopener noreferrer">
       <IconWhatsApp size={18} /> {text}

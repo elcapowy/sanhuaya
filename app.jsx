@@ -375,7 +375,7 @@ function App() {
     }).catch(() => {}); // silencioso si falla
 
     // Abrir WhatsApp con todos los datos
-    const url = 'https://wa.me/5491100000000?text=' + encodeURIComponent(wppMsg());
+    const url = 'https://wa.me/5491134696124?text=' + encodeURIComponent(wppMsg());
     window.open(url, '_blank', 'noopener');
     setStep(6);
   };
@@ -695,7 +695,7 @@ function App() {
                           </div>
                           <a
                             className="rec-add-btn"
-                            href={'https://wa.me/5491100000000?text=' + encodeURIComponent('Hola SANHUA YA, quiero agregar a mi pedido:\n• ' + (a.modelo === 'SP01' ? 'SuperCap Module SP01' : 'Transformador ' + a.modelo) + ' — ' + a.codigo)}
+                            href={'https://wa.me/5491134696124?text=' + encodeURIComponent('Hola SANHUA YA, quiero agregar a mi pedido:\n• ' + (a.modelo === 'SP01' ? 'SuperCap Module SP01' : 'Transformador ' + a.modelo) + ' — ' + a.codigo)}
                             target="_blank" rel="noopener noreferrer"
                             style={{textDecoration:'none',display:'flex',alignItems:'center',gap:'4px'}}
                           >
